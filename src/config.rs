@@ -1,0 +1,99 @@
+use std::fs;
+use std::path::PathBuf;
+
+use anyhow::{Context, Result};
+use secrecy::SecretString;
+use serde::Deserialize;
+
+/// Hybrid configuration loaded from `ec.toml` (non-secrets) plus env vars (secrets & overrides).
+#[derive(Debug, Clone)]
+pub struct Config {
+    // --- From ec.toml (non-secret) ---
+    pub relay_url: String,
+    pub grpc_bind: String,
+    pub rules_dir: PathBuf,
+    pub log_level: String,
+    pub db_path: String,
+
+    // --- From env vars (secrets) ---
+    pub nostr_private_key: SecretString,
+    pub rsa_key_path: PathBuf,
+    pub db_password: Option<SecretString>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct FileConfig {
+    relay_url: String,
+    grpc_bind: String,
+    rules_dir: String,
+    log_level: String,
+    db_path: String,
+}
+
+impl Default for FileConfig {
+    fn default() -> Self {
+        Self {
+            relay_url: "wss://relay.damus.io".to_string(),
+            grpc_bind: "127.0.0.1:50051".to_string(),
+            rules_dir: "./rules".to_string(),
+            log_level: "info".to_string(),
+            db_path: "./ec.db".to_string(),
+        }
+    }
+}
+
+impl Config {
+    pub fn load() -> Result<Self> {
+        // 1. Load .env if present (development convenience)
+        let _ = dotenvy::dotenv();
+
+        // 2. Load ec.toml if present, else use defaults
+        let file_config = Self::load_toml("ec.toml").unwrap_or_default();
+
+        // 3. Env vars override file config
+        let relay_url =
+            std::env::var("RELAY_URL").unwrap_or_else(|_| file_config.relay_url.clone());
+        let grpc_bind =
+            std::env::var("GRPC_BIND").unwrap_or_else(|_| file_config.grpc_bind.clone());
+        let rules_dir = PathBuf::from(
+            std::env::var("RULES_DIR").unwrap_or_else(|_| file_config.rules_dir.clone()),
+        );
+        let log_level =
+            std::env::var("LOG_LEVEL").unwrap_or_else(|_| file_config.log_level.clone());
+        let db_path =
+            std::env::var("DATABASE_URL").unwrap_or_else(|_| file_config.db_path.clone());
+
+        let nostr_private_key = SecretString::new(
+            std::env::var("NOSTR_PRIVATE_KEY")
+                .context("NOSTR_PRIVATE_KEY env var is required")?
+                .into_boxed_str(),
+        );
+        let rsa_key_path = PathBuf::from(
+            std::env::var("EC_RSA_KEY_PATH")
+                .context("EC_RSA_KEY_PATH env var is required")?,
+        );
+        let db_password = std::env::var("EC_DB_PASSWORD")
+            .ok()
+            .map(|s| SecretString::new(s.into_boxed_str()));
+
+        Ok(Self {
+            relay_url,
+            grpc_bind,
+            rules_dir,
+            log_level,
+            db_path,
+            nostr_private_key,
+            rsa_key_path,
+            db_password,
+        })
+    }
+
+    fn load_toml(path: &str) -> Result<FileConfig> {
+        let content = fs::read_to_string(path)
+            .with_context(|| format!("failed to read config file {}", path))?;
+        let cfg: FileConfig =
+            toml::from_str(&content).with_context(|| format!("failed to parse {}", path))?;
+        Ok(cfg)
+    }
+}
+

@@ -1,0 +1,216 @@
+# stv.toml — Single Transferable Vote (STV) Election Rules
+#
+# STV is a preferential voting system designed for multi-winner elections.
+# Voters RANK candidates in order of preference (1st choice, 2nd choice, etc.).
+# Votes transfer between candidates according to preferences, ensuring that
+# wasted votes are minimized and the result reflects the broader will of voters.
+#
+# HOW STV WORKS (simplified):
+#   1. A quota is calculated: the minimum votes needed to win a seat.
+#   2. First-preference votes are counted.
+#   3. Any candidate who reaches the quota is elected.
+#   4. Surplus votes (above the quota) from elected candidates are redistributed
+#      to remaining candidates according to the voters' next preferences.
+#   5. If no one reaches the quota, the candidate with the fewest votes is
+#      eliminated, and their votes are redistributed.
+#   6. Steps 3–5 repeat until all seats are filled.
+#
+# USE CASES:
+#   - Multi-seat elections (board of directors, committee members)
+#   - Elections where proportional representation matters
+#   - Communities that want minority viewpoints represented
+#   - "Voto Único Transferible" (VUT) in Spanish
+#
+# BALLOT FORMAT:
+#   Each voter ranks candidates: 1 = most preferred, 2 = second choice, etc.
+#   Voters MAY rank all candidates or only as many as they wish.
+#   The EC records an ordered list of candidate_ids per vote: [3, 1, 4, 2]
+#
+# REFERENCES:
+#   - pyRCV2 (Python STV counter): https://yingtongli.me/blog/2020/12/24/pyrcv2.html
+#   - pyRCV2 options reference: https://yingtongli.me/git/pyRCV2/about/docs/options.md
+#   - Meek STV spec: http://www.dia.govt.nz/diawebsite.NSF/Files/meekm/%24file/meekm.pdf
+#   - Scottish STV rules: https://www.opavote.com/methods/scottish-stv-rules
+
+[meta]
+name = "Single Transferable Vote (STV)"
+id = "stv"
+version = "1.0.0"
+description = "Preferential multi-winner voting. Voters rank candidates. Votes transfer according to preferences until all seats are filled. Minimizes wasted votes and enables proportional representation."
+
+
+[election]
+# Number of seats (winners) to elect.
+# STV is most valuable when seats >= 2.
+# For seats = 1, STV reduces to Instant Runoff Voting (IRV).
+seats = 3
+
+# Minimum number of candidates required (must be > seats)
+min_candidates = 4
+
+# Maximum number of candidates (0 = unlimited)
+max_candidates = 0
+
+voting_required = false
+
+
+[ballot]
+# Voting method: must be "ranked" for STV
+method = "ranked"
+
+# Minimum number of candidates a voter must rank.
+# 1 = voter may rank only their top choice (partial ranking allowed)
+# Setting this to `seats` ensures voters express enough preferences to be meaningful.
+min_choices = 1
+
+# Maximum number of candidates a voter may rank.
+# 0 = voter may rank all candidates (recommended)
+max_choices = 0
+
+# Whether equal rankings are allowed (e.g., voter gives rank 2 to two candidates).
+# Most STV implementations do NOT allow equal rankings.
+equal_rankings = false
+
+write_ins = false
+
+
+[counting]
+algorithm = "stv"
+
+# --- QUOTA ---
+# The quota is the minimum number of votes a candidate needs to be elected.
+#
+# Options:
+#   "droop"       — floor(V / (S+1)) + 1  (most common, used in Irish/Scottish STV)
+#   "droop_exact" — V / (S+1), not rounded up (use with quota_criterion = "gt")
+#   "hare"        — floor(V / S)           (used in some proportional systems)
+#   "hare_exact"  — V / S, not rounded
+#
+# where V = total valid first-preference votes, S = number of seats.
+# Droop quota is recommended: it guarantees exactly S candidates can be elected.
+quota = "droop"
+
+# Whether to round the quota to a specific number of decimal places.
+# false = use the full precision of the quota formula (recommended for digital counting)
+# true  = round up to `quota_decimal_places` (required for hand-counting rules like ERS97)
+round_quota = false
+# quota_decimal_places = 0
+
+# Quota criterion: when is a candidate considered elected?
+#   "gte" — candidate is elected if votes >= quota (most common)
+#   "gt"  — candidate is elected only if votes > quota (use with droop_exact)
+quota_criterion = "gte"
+
+# Quota mode: can the quota change as votes are exhausted?
+#   "static"      — quota calculated once after first preferences, never changes
+#   "progressive" — quota recalculated each round as votes exhaust (dynamic threshold)
+quota_mode = "static"
+
+
+# --- TRANSFER METHOD ---
+# How surplus votes are transferred when a candidate exceeds the quota.
+#
+# Options:
+#   "weighted_inclusive_gregory" — All ballots of elected candidate are examined.
+#                                   Each ballot is weighted by (surplus / total_votes).
+#                                   RECOMMENDED for digital counting. Used in Scottish STV.
+#   "unweighted_inclusive_gregory" — All ballots examined, but transfers are not weighted
+#                                    (each ballot has equal value). Used in Australian Senate.
+#   "exclusive_gregory"           — Only the last bundle of received ballots is examined.
+#                                   Used in ERS97 and PRSA 1977. Less precise.
+#   "meek"                        — Iterative algorithm. Most mathematically precise.
+#                                   Ballots "flow through" elected candidates at keep factors.
+#                                   Computationally heavier but best for digital elections.
+transfer_method = "weighted_inclusive_gregory"
+
+# Order in which surpluses are distributed when multiple candidates exceed the quota:
+#   "by_size"  — largest surplus transferred first (default, recommended)
+#   "by_order" — surplus of the candidate elected first is transferred first
+surplus_order = "by_size"
+
+# Whether to defer surplus transfers when doing so cannot change the exclusion order.
+# false = always transfer surpluses before excluding candidates (default, recommended)
+# true  = defer surpluses if the exclusion order is certain regardless (ERS97 behavior)
+defer_surpluses = false
+
+# Which ballot papers to examine during surplus transfers:
+#   "all"           — include non-transferable papers (exhausted at their transfer value)
+#   "transferable"  — only transferable papers (non-transferable exhausted if needed)
+transferable_papers = "all"
+
+
+# --- EXCLUSION ---
+# How candidates are eliminated when no one reaches the quota.
+
+# Exclusion method:
+#   "one_round"   — all ballots of excluded candidate(s) transferred in one stage (default)
+#   "by_parcel"   — ballots transferred one parcel at a time, in order received
+#   "by_value"    — ballots transferred in descending order of transfer value
+exclusion_method = "one_round"
+
+# Bulk exclusion: exclude multiple candidates at once when mathematically safe.
+# true  = exclude as many candidates as possible per round (faster for large elections)
+# false = exclude only one candidate per round (safer, more auditable) (default)
+bulk_exclusion = false
+
+# Bulk election: elect all remaining candidates when count = vacancies remaining.
+# true  = declare all remaining candidates elected at once (default, most STV rules)
+# false = continue distributing surpluses even after outcome is determined
+bulk_election = true
+
+
+# --- NUMBERS AND PRECISION ---
+# How vote totals and transfer values are represented internally.
+#
+#   "fixed"         — fixed-precision decimals (default, fast, good for most cases)
+#   "fixed_guarded" — quasi-exact arithmetic with guard digits (more precise)
+#   "rational"      — exact fractions, eliminates rounding error (slow for large elections)
+#   "native"        — native floats (fast but not recommended, rounding errors possible)
+numbers = "fixed"
+
+# Decimal places for fixed-precision arithmetic (ignored for rational/native)
+decimal_places = 5
+
+# Whether to round votes to a specific number of decimal places
+round_votes = false
+# votes_decimal_places = 0
+
+# Whether to round transfer values
+round_transfer_values = false
+# transfer_values_decimal_places = 5
+
+# Whether to round ballot weights during Meek STV
+round_weights = false
+
+
+# --- TIE BREAKING ---
+# What to do when two candidates are tied (same vote count at a critical decision point).
+#
+#   "backwards"  — look at previous rounds; the candidate who was behind earlier is excluded
+#   "random"     — random draw with auditable deterministic RNG (seed published in results)
+#   "manual"     — election admin resolves tie manually via gRPC
+tie_breaking = "backwards"
+
+# If tie_breaking includes "random" as fallback (when backwards doesn't resolve):
+# tie_breaking_seed = ""  # leave empty to generate at election end (published in results)
+
+
+# --- QUORUM ---
+# Minimum voter turnout for results to be valid.
+# 0.0 = no quorum required
+quorum = 0.0
+
+
+[results]
+# STV results are only meaningful at the end (transfers are sequential).
+# "live" here means: publish intermediate tally after each counting round.
+# "final" = only publish when the count is complete.
+publish_tally = "final"
+
+# Whether to publish the full count sheet (each round of transfers)
+# Highly recommended for STV — it's the audit trail.
+publish_count_sheet = true
+
+publish_counts = true
+publish_total_votes = true
+publish_turnout = true

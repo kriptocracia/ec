@@ -1,0 +1,104 @@
+# plurality.toml — Simple Plurality (First Past The Post) Election Rules
+#
+# This is the simplest election system: each voter casts one vote for one candidate.
+# The candidate with the most votes wins, regardless of whether they have a majority.
+# Also known as "First Past the Post" (FPTP) or "mayoría simple" in Spanish.
+#
+# USE CASES:
+#   - Single-winner elections where speed and simplicity are priorities
+#   - Community decisions (condo boards, club presidents, small org votes)
+#   - Binary choices (yes/no referendums — use seats = 1, candidates = 2)
+#
+# BALLOT FORMAT:
+#   Each voter selects exactly ONE candidate. No ranking required.
+#   The EC records a single candidate_id per vote.
+
+[meta]
+# Human-readable name for this rule set
+name = "Simple Plurality (First Past the Post)"
+
+# Short identifier used internally and in Nostr events
+id = "plurality"
+
+# Version of this rule definition
+version = "1.0.0"
+
+# Brief description published in the election announcement (Kind 35000)
+description = "The candidate with the most votes wins. Each voter casts one vote for one candidate. No majority required."
+
+
+[election]
+# Number of winners to elect.
+# For a single president/chair: 1
+# For a yes/no referendum: 1 (majority of 2 candidates)
+seats = 1
+
+# Whether voters MUST vote (true) or voting is optional (false)
+# In Criptocracia context: always false — voters choose to participate
+voting_required = false
+
+# Minimum number of candidates required to hold a valid election
+min_candidates = 2
+
+# Maximum number of candidates allowed (0 = unlimited)
+max_candidates = 0
+
+
+[ballot]
+# Voting method:
+#   "single"     — voter picks exactly one candidate (plurality)
+#   "ranked"     — voter ranks candidates in preference order (for STV, IRV)
+#   "approval"   — voter approves one or more candidates
+method = "single"
+
+# Number of choices each voter must/can make
+# For single: exactly 1
+min_choices = 1
+max_choices = 1
+
+# Whether write-in candidates are allowed (not supported in v1, reserved for future)
+write_ins = false
+
+
+[counting]
+# Counting algorithm:
+#   "plurality"  — candidate with most votes wins (this file)
+#   "stv"        — Single Transferable Vote (see stv.toml)
+#   "irv"        — Instant Runoff Voting (ranked, single winner)
+#   "approval"   — most-approved candidate wins
+algorithm = "plurality"
+
+# Tie-breaking rule when two or more candidates have the same vote count:
+#   "random"     — random draw (auditable with deterministic RNG seed)
+#   "manual"     — election admin resolves tie manually via gRPC
+#   "none"       — declare a tie, no winner (rare, use for referendums)
+tie_breaking = "random"
+
+# If tie_breaking = "random", an optional seed for deterministic/auditable RNG.
+# Leave empty to use a seed generated at election end time (published in results).
+# tie_breaking_seed = ""
+
+# Quorum: minimum percentage of registered voters who must vote for results to be valid.
+# 0.0 = no quorum required (results valid regardless of turnout)
+# 0.5 = 50% of registered voters must participate
+quorum = 0.0
+
+# Minimum votes a winner must receive to be declared valid.
+# 0 = no minimum (winner can win with a single vote)
+min_winner_votes = 1
+
+
+[results]
+# How results are published to Nostr (Kind 35001 events):
+#   "live"       — tally updated after every vote (default, real-time transparency)
+#   "final"      — only published when election finishes
+publish_tally = "live"
+
+# Whether to publish full vote counts per candidate in the tally event
+publish_counts = true
+
+# Whether to publish the total number of votes cast
+publish_total_votes = true
+
+# Whether to publish voter turnout (votes_cast / registered_voters)
+publish_turnout = true
