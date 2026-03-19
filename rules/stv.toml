@@ -189,6 +189,7 @@ round_weights = false
 #   "backwards"  — look at previous rounds; the candidate who was behind earlier is excluded
 #   "random"     — random draw with auditable deterministic RNG (seed published in results)
 #   "manual"     — election admin resolves tie manually via gRPC
+#   (fallback)   — if missing/unknown, implementation falls back to deterministic-by-id
 tie_breaking = "backwards"
 
 # If tie_breaking includes "random" as fallback (when backwards doesn't resolve):
