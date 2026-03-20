@@ -586,26 +586,26 @@ tokio-test  = "0.4"
 ## Tasks
 
 ### Phase 1 — Foundation
-- [ ] Initialize Rust project, Cargo.toml (versions above), `.sqlx/` offline mode
-- [ ] Copy `rules/plurality.toml` and `rules/stv.toml` into repo
-- [ ] Write SQLite migrations (`001_initial.sql`) — include `rules_id` in elections, `candidate_ids TEXT` in votes
-- [ ] Implement `types.rs` structs with serde (include `Ballot = Vec<u8>`)
-- [ ] Implement `config.rs` — hybrid config system (see Config Architecture below)
-- [ ] Add `ec.toml` example file to repo root (non-secret defaults)
+- [x] Initialize Rust project, Cargo.toml (versions above), `.sqlx/` offline mode
+- [x] Copy `rules/plurality.toml` and `rules/stv.toml` into repo
+- [x] Write SQLite migrations (`001_initial.sql`) — include `rules_id` in elections, `candidate_ids TEXT` in votes
+- [x] Implement `types.rs` structs with serde (include `Ballot = Vec<u8>`)
+- [x] Implement `config.rs` — hybrid config system (see Config Architecture below)
+- [x] Add `ec.toml` example file to repo root (non-secret defaults)
 - [ ] Add `.env.example` to repo root (secret vars template, never commit `.env`)
-- [ ] Implement `state.rs` AppState + SharedState
-- [ ] Implement `db.rs` with all query functions
-- [ ] Write `main.rs` startup (DB connect + migrations, Nostr client init, AppState, tracing)
-- [ ] **Verify `cargo build` passes clean**
+- [x] Implement `state.rs` AppState + SharedState
+- [x] Implement `db.rs` with all query functions
+- [x] Write `main.rs` startup (DB connect + migrations, Nostr client init, AppState, tracing)
+- [x] **Verify `cargo build` passes clean**
 
 ### Phase 2 — Rules & Counting Engine
-- [ ] Implement `rules/types.rs`: `ElectionRules` and all sub-structs (serde + toml)
-- [ ] Implement `rules/mod.rs`: `load_rules(rules_id, rules_dir) -> Result<ElectionRules>`
-- [ ] Implement `counting/mod.rs`: `CountingAlgorithm` trait, `CountResult`, `algorithm_for()`
-- [ ] Implement `counting/plurality.rs`: `PluralityAlgorithm` — count single-choice ballots
-- [ ] Implement `counting/stv.rs`: `StvAlgorithm` — weighted inclusive Gregory, Droop quota
-- [ ] Write `tests/counting_plurality_test.rs`: 5 ballots, verify winner
-- [ ] Write `tests/counting_stv_test.rs`: 10 ranked ballots, 2 seats, verify elected
+- [x] Implement `rules/types.rs`: `ElectionRules` and all sub-structs (serde + toml)
+- [x] Implement `rules/mod.rs`: `load_rules(rules_id, rules_dir) -> Result<ElectionRules>`
+- [x] Implement `counting/mod.rs`: `CountingAlgorithm` trait, `CountResult`, `algorithm_for()`
+- [x] Implement `counting/plurality.rs`: `PluralityAlgorithm` — count single-choice ballots
+- [x] Implement `counting/stv.rs`: `StvAlgorithm` — weighted inclusive Gregory, Droop quota
+- [x] Write `tests/counting_plurality_test.rs`: 5 ballots, verify winner
+- [x] Write `tests/counting_stv_test.rs`: 10 ranked ballots, 2 seats, verify elected
 
 ### Phase 3 — Cryptography
 - [ ] Implement `crypto.rs`: `generate_keypair()`, `blind_sign()`, `verify_token()`
