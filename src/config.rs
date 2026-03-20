@@ -33,7 +33,7 @@ struct FileConfig {
 impl Default for FileConfig {
     fn default() -> Self {
         Self {
-            relay_url: "wss://relay.damus.io".to_string(),
+            relay_url: "wss://relay.mostro.network".to_string(),
             grpc_bind: "127.0.0.1:50051".to_string(),
             rules_dir: "./rules".to_string(),
             log_level: "info".to_string(),

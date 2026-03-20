@@ -394,7 +394,7 @@ Add these to the `[dependencies]` section of `Cargo.toml`.
 # ec.toml — operator configuration, safe to version control
 # No secrets here. Ever.
 
-relay_url  = "wss://relay.damus.io"
+relay_url  = "wss://relay.mostro.network"
 grpc_bind  = "127.0.0.1:50051"
 rules_dir  = "./rules"
 log_level  = "info"

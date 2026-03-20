@@ -36,7 +36,7 @@ Example `ec.toml` (already included in the repo):
 # ec.toml — operator configuration, safe to version control
 # No secrets here. Ever.
 
-relay_url  = "wss://relay.damus.io"
+relay_url  = "wss://relay.mostro.network"
 grpc_bind  = "127.0.0.1:50051"
 rules_dir  = "./rules"
 log_level  = "info"
