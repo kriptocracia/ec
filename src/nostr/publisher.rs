@@ -68,7 +68,7 @@ pub async fn publish_result_event(
             json!({
                 "candidate_id": t.candidate_id,
                 "votes": t.votes,
-                "status": format!("{:?}", t.status),
+                "status": t.status.as_str(),
             })
         })
         .collect();
@@ -94,7 +94,7 @@ pub async fn publish_result_event(
                         json!({
                             "candidate_id": t.candidate_id,
                             "votes": t.votes,
-                            "status": format!("{:?}", t.status),
+                            "status": t.status.as_str(),
                         })
                     })
                     .collect();

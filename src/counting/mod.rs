@@ -24,6 +24,17 @@ pub enum CandidateStatus {
     Excluded,
 }
 
+impl CandidateStatus {
+    /// Stable wire representation — independent of Rust variant names.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Active => "active",
+            Self::Elected => "elected",
+            Self::Excluded => "excluded",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct CandidateTally {
     pub candidate_id: u8,
