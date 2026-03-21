@@ -14,5 +14,6 @@ pub fn load_rules(rules_id: &str, rules_dir: &Path) -> Result<ElectionRules> {
         .with_context(|| format!("Rules file not found: {}", path.display()))?;
     let rules: ElectionRules = toml::from_str(&content)
         .with_context(|| format!("Failed to parse rules file: {}", path.display()))?;
+    tracing::debug!(rules_id, path = %path.display(), "Election rules loaded");
     Ok(rules)
 }

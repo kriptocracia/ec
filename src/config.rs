@@ -70,7 +70,7 @@ impl Config {
             .ok()
             .map(|s| SecretString::new(s.into_boxed_str()));
 
-        Ok(Self {
+        let config = Self {
             relay_url,
             grpc_bind,
             rules_dir,
@@ -78,7 +78,17 @@ impl Config {
             db_path,
             nostr_private_key,
             db_password,
-        })
+        };
+
+        tracing::info!(
+            relay_url = %config.relay_url,
+            grpc_bind = %config.grpc_bind,
+            rules_dir = %config.rules_dir.display(),
+            db_path = %config.db_path,
+            "Configuration loaded"
+        );
+
+        Ok(config)
     }
 
     fn load_toml(path: &str) -> Result<FileConfig> {

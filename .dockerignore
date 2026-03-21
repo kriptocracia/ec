@@ -1,0 +1,11 @@
+target/
+.git/
+.env
+.env.*
+*.pem
+ec.db
+ec.db-*
+.sqlx/
+.vscode/
+.idea/
+*.log

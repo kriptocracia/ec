@@ -319,7 +319,9 @@ pub async fn consume_registration_token(
     .execute(tx.as_mut())
     .await?;
 
-    Ok(result.rows_affected())
+    let rows = result.rows_affected();
+    tracing::debug!(election_id, rows, "consume_registration_token");
+    Ok(rows)
 }
 
 /// Insert an authorized voter record. Returns the number of rows affected.
@@ -340,7 +342,9 @@ pub async fn authorize_voter(
     .execute(tx.as_mut())
     .await?;
 
-    Ok(result.rows_affected())
+    let rows = result.rows_affected();
+    tracing::debug!(election_id, rows, "authorize_voter");
+    Ok(rows)
 }
 
 pub async fn get_authorized_voter(
@@ -380,7 +384,9 @@ pub async fn mark_token_issued(
     .execute(tx.as_mut())
     .await?;
 
-    Ok(result.rows_affected())
+    let rows = result.rows_affected();
+    tracing::debug!(election_id, rows, "mark_token_issued");
+    Ok(rows)
 }
 
 pub async fn is_nonce_used(pool: &SqlitePool, election_id: &str, h_n: &str) -> Result<bool> {
@@ -433,7 +439,9 @@ pub async fn try_mark_nonce_used(
     .execute(tx.as_mut())
     .await?;
 
-    Ok(result.rows_affected() == 1)
+    let was_new = result.rows_affected() == 1;
+    tracing::debug!(election_id, was_new, "try_mark_nonce_used");
+    Ok(was_new)
 }
 
 pub async fn insert_vote(pool: &SqlitePool, vote: &Vote) -> Result<()> {
