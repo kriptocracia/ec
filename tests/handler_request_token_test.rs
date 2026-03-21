@@ -3,13 +3,18 @@ use blind_rsa_signatures::{DefaultRng, PSS, Randomized, Sha384};
 use nostr_sdk::prelude::*;
 use secrecy::SecretString;
 use sqlx::SqlitePool;
+use sqlx::sqlite::SqlitePoolOptions;
 
 use ec::db;
 use ec::handlers::request_token;
 use ec::types::Election;
 
 async fn setup_db() -> SqlitePool {
-    let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+    let pool = SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect("sqlite::memory:")
+        .await
+        .unwrap();
     sqlx::migrate!("./migrations").run(&pool).await.unwrap();
     pool
 }

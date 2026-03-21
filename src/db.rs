@@ -190,7 +190,7 @@ pub async fn mark_results_published(pool: &SqlitePool, election_id: &str) -> Res
         r#"
         UPDATE elections
         SET results_published = 1
-        WHERE id = ?1 AND results_published = 0
+        WHERE id = ?1 AND status = 'finished' AND results_published = 0
         "#,
     )
     .bind(election_id)

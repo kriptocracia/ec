@@ -53,16 +53,25 @@ async fn main() -> Result<()> {
     // Wait for either task to finish (they run forever under normal operation).
     tokio::select! {
         res = scheduler_handle => {
-            tracing::error!("Scheduler exited unexpectedly");
-            res?
+            match res {
+                Ok(()) => {
+                    tracing::error!("Scheduler exited unexpectedly");
+                    anyhow::bail!("Scheduler exited unexpectedly")
+                }
+                Err(join_err) => Err(join_err.into()),
+            }
         }
         res = listener_handle => {
-            tracing::error!("Nostr listener exited unexpectedly");
-            res??
+            match res {
+                Ok(Ok(())) => {
+                    tracing::error!("Nostr listener exited unexpectedly");
+                    anyhow::bail!("Nostr listener exited unexpectedly")
+                }
+                Ok(Err(e)) => Err(e),
+                Err(join_err) => Err(join_err.into()),
+            }
         }
     }
-
-    Ok(())
 }
 
 fn init_tracing() {
