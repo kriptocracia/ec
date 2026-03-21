@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 use nostr_sdk::prelude::{Client, Keys};
 use secrecy::ExposeSecret;
@@ -27,16 +29,49 @@ async fn main() -> Result<()> {
     let nostr_client = Client::builder().signer(keys.clone()).build();
     let ec_nostr_keys = keys;
 
-    let _state = AppState {
+    let state = Arc::new(AppState {
         db,
         nostr_client,
         ec_nostr_keys,
         config,
-    };
+    });
 
-    tracing::info!("EC daemon initialized (Phase 1 foundation)");
+    tracing::info!("EC daemon starting");
 
-    Ok(())
+    // Spawn the scheduler (30s tick: status transitions + counting + result publishing).
+    let scheduler_handle = tokio::spawn(ec::scheduler::run(
+        state.db.clone(),
+        state.nostr_client.clone(),
+        state.config.rules_dir.clone(),
+    ));
+
+    // Spawn the Nostr Gift Wrap listener.
+    let listener_handle = tokio::spawn(ec::nostr::listener::listen(state.clone()));
+
+    tracing::info!("EC daemon running");
+
+    // Wait for either task to finish (they run forever under normal operation).
+    tokio::select! {
+        res = scheduler_handle => {
+            match res {
+                Ok(()) => {
+                    tracing::error!("Scheduler exited unexpectedly");
+                    anyhow::bail!("Scheduler exited unexpectedly")
+                }
+                Err(join_err) => Err(join_err.into()),
+            }
+        }
+        res = listener_handle => {
+            match res {
+                Ok(Ok(())) => {
+                    tracing::error!("Nostr listener exited unexpectedly");
+                    anyhow::bail!("Nostr listener exited unexpectedly")
+                }
+                Ok(Err(e)) => Err(e),
+                Err(join_err) => Err(join_err.into()),
+            }
+        }
+    }
 }
 
 fn init_tracing() {

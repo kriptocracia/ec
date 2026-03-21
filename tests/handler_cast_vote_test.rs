@@ -3,6 +3,7 @@ use blind_rsa_signatures::{DefaultRng, PSS, Randomized, Sha384};
 use secrecy::SecretString;
 use sha2::Digest;
 use sqlx::SqlitePool;
+use sqlx::sqlite::SqlitePoolOptions;
 use std::path::Path;
 
 use ec::crypto;
@@ -11,7 +12,11 @@ use ec::handlers::cast_vote;
 use ec::types::{Candidate, Election};
 
 async fn setup_db() -> SqlitePool {
-    let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+    let pool = SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect("sqlite::memory:")
+        .await
+        .unwrap();
     sqlx::migrate!("./migrations").run(&pool).await.unwrap();
     pool
 }
@@ -38,6 +43,7 @@ async fn seed_election(pool: &SqlitePool, te: &TestElection, rules_id: &str) {
         rules_id: rules_id.to_string(),
         rsa_pub_key: te.pk_b64.clone(),
         created_at: 1000,
+        results_published: 0,
     };
     db::create_election(
         pool,

@@ -1,13 +1,18 @@
 use nostr_sdk::prelude::*;
 use secrecy::SecretString;
 use sqlx::SqlitePool;
+use sqlx::sqlite::SqlitePoolOptions;
 
 use ec::db;
 use ec::handlers::register;
 use ec::types::Election;
 
 async fn setup_db() -> SqlitePool {
-    let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+    let pool = SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect("sqlite::memory:")
+        .await
+        .unwrap();
     sqlx::migrate!("./migrations").run(&pool).await.unwrap();
     pool
 }
@@ -22,6 +27,7 @@ fn test_election(status: &str) -> Election {
         rules_id: "plurality".to_string(),
         rsa_pub_key: "dummy-pk".to_string(),
         created_at: 1000,
+        results_published: 0,
     }
 }
 

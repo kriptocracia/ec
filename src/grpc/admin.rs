@@ -80,6 +80,7 @@ impl Admin for AdminService {
             rules_id: req.rules_id,
             rsa_pub_key: pk_b64,
             created_at: now,
+            results_published: 0,
         };
 
         let sk_secret = SecretString::new(sk_b64.into_boxed_str());

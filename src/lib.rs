@@ -6,5 +6,6 @@ pub mod grpc;
 pub mod handlers;
 pub mod nostr;
 pub mod rules;
+pub mod scheduler;
 pub mod state;
 pub mod types;
