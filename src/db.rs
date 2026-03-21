@@ -62,7 +62,7 @@ pub async fn get_election_key(pool: &SqlitePool, election_id: &str) -> Result<Op
 pub async fn get_election(pool: &SqlitePool, id: &str) -> Result<Option<Election>> {
     let election = sqlx::query_as::<_, Election>(
         r#"
-        SELECT id, name, start_time, end_time, status, rules_id, rsa_pub_key, created_at
+        SELECT id, name, start_time, end_time, status, rules_id, rsa_pub_key, created_at, results_published
         FROM elections
         WHERE id = ?1
         "#,
@@ -77,7 +77,7 @@ pub async fn get_election(pool: &SqlitePool, id: &str) -> Result<Option<Election
 pub async fn list_elections(pool: &SqlitePool) -> Result<Vec<Election>> {
     let elections = sqlx::query_as::<_, Election>(
         r#"
-        SELECT id, name, start_time, end_time, status, rules_id, rsa_pub_key, created_at
+        SELECT id, name, start_time, end_time, status, rules_id, rsa_pub_key, created_at, results_published
         FROM elections
         ORDER BY created_at DESC
         "#,
@@ -94,6 +94,103 @@ pub async fn cancel_election(pool: &SqlitePool, election_id: &str) -> Result<u64
         UPDATE elections
         SET status = 'cancelled'
         WHERE id = ?1 AND status IN ('open', 'in_progress')
+        "#,
+    )
+    .bind(election_id)
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected())
+}
+
+/// Fetch elections whose `start_time` has passed but are still `open`.
+pub async fn elections_ready_to_start(pool: &SqlitePool, now: i64) -> Result<Vec<Election>> {
+    let rows = sqlx::query_as::<_, Election>(
+        r#"
+        SELECT id, name, start_time, end_time, status, rules_id, rsa_pub_key, created_at, results_published
+        FROM elections
+        WHERE status = 'open' AND start_time <= ?1
+        "#,
+    )
+    .bind(now)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows)
+}
+
+/// Fetch elections whose `end_time` has passed but are still `in_progress`.
+pub async fn elections_ready_to_finish(pool: &SqlitePool, now: i64) -> Result<Vec<Election>> {
+    let rows = sqlx::query_as::<_, Election>(
+        r#"
+        SELECT id, name, start_time, end_time, status, rules_id, rsa_pub_key, created_at, results_published
+        FROM elections
+        WHERE status = 'in_progress' AND end_time <= ?1
+        "#,
+    )
+    .bind(now)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows)
+}
+
+/// Atomically transition an election from `open` to `in_progress`.
+/// Returns rows affected (0 if already transitioned or not found).
+pub async fn start_election(pool: &SqlitePool, election_id: &str) -> Result<u64> {
+    let result = sqlx::query(
+        r#"
+        UPDATE elections
+        SET status = 'in_progress'
+        WHERE id = ?1 AND status = 'open'
+        "#,
+    )
+    .bind(election_id)
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected())
+}
+
+/// Atomically transition an election from `in_progress` to `finished`.
+/// Returns rows affected (0 if already transitioned or not found).
+pub async fn finish_election(pool: &SqlitePool, election_id: &str) -> Result<u64> {
+    let result = sqlx::query(
+        r#"
+        UPDATE elections
+        SET status = 'finished'
+        WHERE id = ?1 AND status = 'in_progress'
+        "#,
+    )
+    .bind(election_id)
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected())
+}
+
+/// Fetch finished elections whose results have not yet been published.
+pub async fn elections_pending_results(pool: &SqlitePool) -> Result<Vec<Election>> {
+    let rows = sqlx::query_as::<_, Election>(
+        r#"
+        SELECT id, name, start_time, end_time, status, rules_id, rsa_pub_key, created_at, results_published
+        FROM elections
+        WHERE status = 'finished' AND results_published = 0
+        "#,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows)
+}
+
+/// Mark an election's results as successfully published.
+pub async fn mark_results_published(pool: &SqlitePool, election_id: &str) -> Result<u64> {
+    let result = sqlx::query(
+        r#"
+        UPDATE elections
+        SET results_published = 1
+        WHERE id = ?1 AND results_published = 0
         "#,
     )
     .bind(election_id)

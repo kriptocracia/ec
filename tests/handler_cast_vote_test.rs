@@ -38,6 +38,7 @@ async fn seed_election(pool: &SqlitePool, te: &TestElection, rules_id: &str) {
         rules_id: rules_id.to_string(),
         rsa_pub_key: te.pk_b64.clone(),
         created_at: 1000,
+        results_published: 0,
     };
     db::create_election(
         pool,

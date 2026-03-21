@@ -28,6 +28,7 @@ async fn seed_election_with_key(pool: &SqlitePool, status: &str, pk_b64: &str, s
         rules_id: "plurality".to_string(),
         rsa_pub_key: pk_b64.to_string(),
         created_at: 1000,
+        results_published: 0,
     };
     db::create_election(pool, &election, &SecretString::new(sk_b64.into()))
         .await

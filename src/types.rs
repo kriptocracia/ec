@@ -14,6 +14,7 @@ pub struct Election {
     pub rules_id: String,
     pub rsa_pub_key: String,
     pub created_at: i64,
+    pub results_published: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]

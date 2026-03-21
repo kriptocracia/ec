@@ -22,6 +22,7 @@ fn test_election(status: &str) -> Election {
         rules_id: "plurality".to_string(),
         rsa_pub_key: "dummy-pk".to_string(),
         created_at: 1000,
+        results_published: 0,
     }
 }
 

@@ -46,8 +46,8 @@
 - [x] Implement `GenerateRegistrationTokens`
 
 ## Phase 7 — Scheduler
-- [ ] Implement `scheduler.rs`: 30s tick, status transitions
-- [ ] On `Finished`: load rules → `algorithm_for(rules_id)?.count()` → publish result
+- [x] Implement `scheduler.rs`: 30s tick, status transitions
+- [x] On `Finished`: load rules → `algorithm_for(rules_id)?.count()` → publish result
 
 ## Phase 8 — Polish
 - [ ] `tracing` instrumentation throughout
