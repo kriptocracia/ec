@@ -80,4 +80,3 @@ pub struct ResultsConfig {
 
 /// Convenience type re-exported for counting engine.
 pub type RulesPath = PathBuf;
-

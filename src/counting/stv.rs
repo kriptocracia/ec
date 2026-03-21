@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::Result;
-use rand::{rngs::StdRng, RngExt, SeedableRng};
+use rand::{RngExt, SeedableRng, rngs::StdRng};
 use sha2::{Digest, Sha256};
 
 use crate::counting::{
@@ -26,20 +26,20 @@ impl CountingAlgorithm for StvAlgorithm {
             anyhow::bail!("STV requires ranked ballots");
         }
         // Explicitly reject TOML options we do not support yet.
-        if let Some(mode) = rules.counting.quota_mode.as_deref() {
-            if mode != "static" {
-                anyhow::bail!("NotImplemented: quota_mode={mode}");
-            }
+        if let Some(mode) = rules.counting.quota_mode.as_deref()
+            && mode != "static"
+        {
+            anyhow::bail!("NotImplemented: quota_mode={mode}");
         }
-        if let Some(criterion) = rules.counting.quota_criterion.as_deref() {
-            if criterion != "gte" {
-                anyhow::bail!("NotImplemented: quota_criterion={criterion}");
-            }
+        if let Some(criterion) = rules.counting.quota_criterion.as_deref()
+            && criterion != "gte"
+        {
+            anyhow::bail!("NotImplemented: quota_criterion={criterion}");
         }
-        if let Some(order) = rules.counting.surplus_order.as_deref() {
-            if order != "by_size" {
-                anyhow::bail!("NotImplemented: surplus_order={order}");
-            }
+        if let Some(order) = rules.counting.surplus_order.as_deref()
+            && order != "by_size"
+        {
+            anyhow::bail!("NotImplemented: surplus_order={order}");
         }
         if let Some(true) = rules.counting.bulk_exclusion {
             anyhow::bail!("NotImplemented: bulk_exclusion=true");
@@ -148,7 +148,9 @@ impl CountingAlgorithm for StvAlgorithm {
             // then transfer surplus using WIG.
             let mut winners: Vec<(u8, f64)> = tallies_map
                 .iter()
-                .filter(|(id, votes)| status[id] == CandidateStatus::Active && **votes + eps >= quota)
+                .filter(|(id, votes)| {
+                    status[id] == CandidateStatus::Active && **votes + eps >= quota
+                })
                 .map(|(&id, &votes)| (id, votes))
                 .collect();
             winners.sort_by(|a, b| {
@@ -303,7 +305,10 @@ fn next_active_pref_index(
     None
 }
 
-fn assigned_candidate(ballot: &WeightedBallot, status: &BTreeMap<u8, CandidateStatus>) -> Option<u8> {
+fn assigned_candidate(
+    ballot: &WeightedBallot,
+    status: &BTreeMap<u8, CandidateStatus>,
+) -> Option<u8> {
     next_active_pref_index(ballot, status).map(|i| ballot.prefs[i])
 }
 
@@ -373,13 +378,13 @@ fn break_tie_backwards(tied: &[u8], rounds: &[CountRound], objective: TieObjecti
 
         let first = votes.first().copied();
         let last = votes.last().copied();
-        if let (Some(f), Some(l)) = (first, last) {
-            if !approx_equal(f.1, l.1, 1e-9) {
-                return match objective {
-                    TieObjective::LowestLosesTrue => f.0,
-                    TieObjective::HighestLosesFalse => l.0,
-                };
-            }
+        if let (Some(f), Some(l)) = (first, last)
+            && !approx_equal(f.1, l.1, 1e-9)
+        {
+            return match objective {
+                TieObjective::LowestLosesTrue => f.0,
+                TieObjective::HighestLosesFalse => l.0,
+            };
         }
     }
 
@@ -407,4 +412,3 @@ fn default_tie_seed(candidate_ids: &BTreeSet<u8>) -> u64 {
 fn approx_equal(a: f64, b: f64, eps: f64) -> bool {
     (a - b).abs() <= eps
 }
-

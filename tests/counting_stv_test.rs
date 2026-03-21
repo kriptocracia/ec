@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use ec::counting::{algorithm_for, Ballot};
+use ec::counting::{Ballot, algorithm_for};
 use ec::rules::load_rules;
 
 #[test]
@@ -56,4 +56,3 @@ fn stv_excludes_lowest_and_transfers_preferences() {
     // the same candidate twice or fewer than the requested number of seats.
     assert_eq!(result.elected.len(), 2);
 }
-

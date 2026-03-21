@@ -57,4 +57,3 @@ impl CountingAlgorithm for PluralityAlgorithm {
         })
     }
 }
-

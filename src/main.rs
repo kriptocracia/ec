@@ -1,16 +1,11 @@
-mod config;
-mod db;
-mod state;
-mod types;
-
 use anyhow::Result;
-use secrecy::ExposeSecret;
 use nostr_sdk::prelude::{Client, Keys};
+use secrecy::ExposeSecret;
 use sqlx::sqlite::SqlitePoolOptions;
 use tracing_subscriber::EnvFilter;
 
-use crate::config::Config;
-use crate::state::AppState;
+use ec::config::Config;
+use ec::state::AppState;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -53,4 +48,3 @@ fn init_tracing() {
         .compact()
         .init();
 }
-

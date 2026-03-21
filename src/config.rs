@@ -59,8 +59,7 @@ impl Config {
         );
         let log_level =
             std::env::var("LOG_LEVEL").unwrap_or_else(|_| file_config.log_level.clone());
-        let db_path =
-            std::env::var("DATABASE_URL").unwrap_or_else(|_| file_config.db_path.clone());
+        let db_path = std::env::var("DATABASE_URL").unwrap_or_else(|_| file_config.db_path.clone());
 
         let nostr_private_key = SecretString::new(
             std::env::var("NOSTR_PRIVATE_KEY")
@@ -90,4 +89,3 @@ impl Config {
         Ok(cfg)
     }
 }
-

@@ -67,4 +67,3 @@ pub fn algorithm_for(rules_id: &str) -> Result<Box<dyn CountingAlgorithm>> {
         other => anyhow::bail!("UNKNOWN_RULES: {}", other),
     }
 }
-

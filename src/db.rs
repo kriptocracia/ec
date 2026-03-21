@@ -1,11 +1,13 @@
 use anyhow::Result;
 use sqlx::{Sqlite, SqlitePool, Transaction};
 
-use crate::types::{
-    AuthorizedVoter, Candidate, Election, RegistrationToken, UsedNonce, Vote,
-};
+use crate::types::{AuthorizedVoter, Candidate, Election, UsedNonce, Vote};
 
-pub async fn create_election(pool: &SqlitePool, election: &Election, rsa_priv_key: &str) -> Result<()> {
+pub async fn create_election(
+    pool: &SqlitePool,
+    election: &Election,
+    rsa_priv_key: &str,
+) -> Result<()> {
     let mut tx = pool.begin().await?;
 
     sqlx::query(
@@ -221,11 +223,7 @@ pub async fn mark_token_issued(
     Ok(result.rows_affected())
 }
 
-pub async fn is_nonce_used(
-    pool: &SqlitePool,
-    election_id: &str,
-    h_n: &str,
-) -> Result<bool> {
+pub async fn is_nonce_used(pool: &SqlitePool, election_id: &str, h_n: &str) -> Result<bool> {
     let existing: Option<UsedNonce> = sqlx::query_as(
         r#"
         SELECT h_n, election_id, recorded_at
@@ -241,11 +239,7 @@ pub async fn is_nonce_used(
     Ok(existing.is_some())
 }
 
-pub async fn mark_nonce_used(
-    pool: &SqlitePool,
-    election_id: &str,
-    h_n: &str,
-) -> Result<()> {
+pub async fn mark_nonce_used(pool: &SqlitePool, election_id: &str, h_n: &str) -> Result<()> {
     sqlx::query(
         r#"
         INSERT INTO used_nonces (h_n, election_id)
@@ -258,6 +252,28 @@ pub async fn mark_nonce_used(
     .await?;
 
     Ok(())
+}
+
+/// Atomically attempt to mark a nonce as used via INSERT.
+/// Returns `true` if the nonce was newly inserted, `false` if it already existed
+/// (relies on the PRIMARY KEY constraint on (h_n, election_id)).
+pub async fn try_mark_nonce_used(
+    tx: &mut Transaction<'_, Sqlite>,
+    election_id: &str,
+    h_n: &str,
+) -> Result<bool> {
+    let result = sqlx::query(
+        r#"
+        INSERT OR IGNORE INTO used_nonces (h_n, election_id)
+        VALUES (?1, ?2)
+        "#,
+    )
+    .bind(h_n)
+    .bind(election_id)
+    .execute(tx.as_mut())
+    .await?;
+
+    Ok(result.rows_affected() == 1)
 }
 
 pub async fn insert_vote(pool: &SqlitePool, vote: &Vote) -> Result<()> {
@@ -276,10 +292,23 @@ pub async fn insert_vote(pool: &SqlitePool, vote: &Vote) -> Result<()> {
     Ok(())
 }
 
-pub async fn get_votes_for_election(
-    pool: &SqlitePool,
-    election_id: &str,
-) -> Result<Vec<Vote>> {
+pub async fn insert_vote_tx(tx: &mut Transaction<'_, Sqlite>, vote: &Vote) -> Result<()> {
+    sqlx::query(
+        r#"
+        INSERT INTO votes (election_id, candidate_ids, recorded_at)
+        VALUES (?1, ?2, ?3)
+        "#,
+    )
+    .bind(&vote.election_id)
+    .bind(&vote.candidate_ids)
+    .bind(vote.recorded_at)
+    .execute(tx.as_mut())
+    .await?;
+
+    Ok(())
+}
+
+pub async fn get_votes_for_election(pool: &SqlitePool, election_id: &str) -> Result<Vec<Vote>> {
     let votes = sqlx::query_as::<_, Vote>(
         r#"
         SELECT id, election_id, candidate_ids, recorded_at
@@ -294,4 +323,3 @@ pub async fn get_votes_for_election(
 
     Ok(votes)
 }
-

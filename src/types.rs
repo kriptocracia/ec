@@ -55,4 +55,3 @@ pub struct Vote {
     pub candidate_ids: String,
     pub recorded_at: i64,
 }
-

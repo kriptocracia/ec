@@ -16,4 +16,3 @@ pub fn load_rules(rules_id: &str, rules_dir: &Path) -> Result<ElectionRules> {
         .with_context(|| format!("Failed to parse rules file: {}", path.display()))?;
     Ok(rules)
 }
-
