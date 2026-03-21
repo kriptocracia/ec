@@ -119,6 +119,27 @@ pub async fn add_candidate(pool: &SqlitePool, candidate: &Candidate) -> Result<(
     Ok(())
 }
 
+/// Insert a candidate only if the referenced election has status = 'open'.
+/// Returns the number of rows inserted (0 if election not found or not open).
+pub async fn add_candidate_if_open(pool: &SqlitePool, candidate: &Candidate) -> Result<u64> {
+    let result = sqlx::query(
+        r#"
+        INSERT INTO candidates (id, election_id, name)
+        SELECT ?1, ?2, ?3
+        WHERE EXISTS (
+            SELECT 1 FROM elections WHERE id = ?2 AND status = 'open'
+        )
+        "#,
+    )
+    .bind(candidate.id)
+    .bind(&candidate.election_id)
+    .bind(&candidate.name)
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected())
+}
+
 pub async fn get_candidates_for_election(
     pool: &SqlitePool,
     election_id: &str,
@@ -142,9 +163,10 @@ pub async fn insert_registration_tokens(
     tx: &mut Transaction<'_, Sqlite>,
     election_id: &str,
     tokens: &[String],
-) -> Result<()> {
+) -> Result<u64> {
+    let mut total: u64 = 0;
     for token in tokens {
-        sqlx::query(
+        let result = sqlx::query(
             r#"
             INSERT INTO registration_tokens (token, election_id)
             VALUES (?1, ?2)
@@ -154,9 +176,10 @@ pub async fn insert_registration_tokens(
         .bind(election_id)
         .execute(tx.as_mut())
         .await?;
+        total += result.rows_affected();
     }
 
-    Ok(())
+    Ok(total)
 }
 
 pub async fn list_registration_tokens(

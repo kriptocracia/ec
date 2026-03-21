@@ -51,9 +51,18 @@ impl Admin for AdminService {
             ));
         }
 
+        // Sanitize rules_id to prevent path traversal
+        if req.rules_id.is_empty()
+            || req.rules_id.contains('/')
+            || req.rules_id.contains('\\')
+            || req.rules_id.contains("..")
+        {
+            return Err(Status::invalid_argument("Invalid rules_id"));
+        }
+
         // Validate rules exist before creating election
         rules::load_rules(&req.rules_id, &self.rules_dir)
-            .map_err(|e| Status::invalid_argument(format!("Invalid rules_id: {e}")))?;
+            .map_err(|_| Status::invalid_argument("Invalid rules_id"))?;
 
         // Generate RSA keypair for this election
         let (pk_b64, sk_b64) =
@@ -88,27 +97,29 @@ impl Admin for AdminService {
     ) -> Result<Response<CandidateResponse>, Status> {
         let req = request.into_inner();
 
-        // Validate election exists
-        let election = db::get_election(&self.pool, &req.election_id)
-            .await
-            .map_err(|e| Status::internal(e.to_string()))?
-            .ok_or_else(|| Status::not_found("Election not found"))?;
-
-        if election.status != "open" {
-            return Err(Status::failed_precondition(
-                "Candidates can only be added to open elections",
+        // Validate candidate ID fits in u8 range
+        if req.id > 255 {
+            return Err(Status::invalid_argument(
+                "Candidate ID must be between 0 and 255",
             ));
         }
 
+        // Atomically insert candidate only if election is open
         let candidate = Candidate {
             id: req.id as i64,
             election_id: req.election_id,
             name: req.name,
         };
 
-        db::add_candidate(&self.pool, &candidate)
+        let rows = db::add_candidate_if_open(&self.pool, &candidate)
             .await
             .map_err(|e| Status::internal(e.to_string()))?;
+
+        if rows == 0 {
+            return Err(Status::failed_precondition(
+                "Election not found or not open for candidate registration",
+            ));
+        }
 
         tracing::info!(
             election_id = %candidate.election_id,
@@ -210,9 +221,13 @@ impl Admin for AdminService {
             .await
             .map_err(|e| Status::internal(e.to_string()))?;
 
-        db::insert_registration_tokens(&mut tx, &req.election_id, &tokens)
+        let inserted = db::insert_registration_tokens(&mut tx, &req.election_id, &tokens)
             .await
             .map_err(|e| Status::internal(e.to_string()))?;
+
+        if inserted != tokens.len() as u64 {
+            return Err(Status::internal("Failed to insert all registration tokens"));
+        }
 
         tx.commit()
             .await
