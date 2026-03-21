@@ -1,0 +1,263 @@
+use secrecy::SecretString;
+use sha2::{Digest, Sha256};
+use sqlx::SqlitePool;
+use tonic::{Request, Response, Status};
+
+use crate::grpc::proto::admin_server::Admin;
+use crate::grpc::proto::{
+    AddCandidateRequest, AddElectionRequest, CandidateResponse, ElectionIdRequest,
+    ElectionListResponse, ElectionResponse, Empty, GenerateTokensRequest, StatusResponse,
+    TokenInfo, TokenListResponse, TokensResponse,
+};
+use crate::types::{Candidate, Election};
+use crate::{crypto, db, rules};
+
+pub struct AdminService {
+    pool: SqlitePool,
+    rules_dir: std::path::PathBuf,
+}
+
+impl AdminService {
+    pub fn new(pool: SqlitePool, rules_dir: std::path::PathBuf) -> Self {
+        Self { pool, rules_dir }
+    }
+}
+
+fn election_to_response(e: &Election) -> ElectionResponse {
+    ElectionResponse {
+        id: e.id.clone(),
+        name: e.name.clone(),
+        start_time: e.start_time,
+        end_time: e.end_time,
+        status: e.status.clone(),
+        rules_id: e.rules_id.clone(),
+        rsa_pub_key: e.rsa_pub_key.clone(),
+        created_at: e.created_at,
+    }
+}
+
+#[tonic::async_trait]
+impl Admin for AdminService {
+    async fn add_election(
+        &self,
+        request: Request<AddElectionRequest>,
+    ) -> Result<Response<ElectionResponse>, Status> {
+        let req = request.into_inner();
+
+        // Validate time constraints
+        if req.end_time <= req.start_time {
+            return Err(Status::invalid_argument(
+                "end_time must be greater than start_time",
+            ));
+        }
+
+        // Validate rules exist before creating election
+        rules::load_rules(&req.rules_id, &self.rules_dir)
+            .map_err(|e| Status::invalid_argument(format!("Invalid rules_id: {e}")))?;
+
+        // Generate RSA keypair for this election
+        let (pk_b64, sk_b64) =
+            crypto::generate_keypair().map_err(|e| Status::internal(e.to_string()))?;
+
+        let election_id = nanoid::nanoid!();
+        let now = chrono::Utc::now().timestamp();
+
+        let election = Election {
+            id: election_id,
+            name: req.name,
+            start_time: req.start_time,
+            end_time: req.end_time,
+            status: "open".to_string(),
+            rules_id: req.rules_id,
+            rsa_pub_key: pk_b64,
+            created_at: now,
+        };
+
+        let sk_secret = SecretString::new(sk_b64.into_boxed_str());
+        db::create_election(&self.pool, &election, &sk_secret)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?;
+
+        tracing::info!(election_id = %election.id, "Election created");
+        Ok(Response::new(election_to_response(&election)))
+    }
+
+    async fn add_candidate(
+        &self,
+        request: Request<AddCandidateRequest>,
+    ) -> Result<Response<CandidateResponse>, Status> {
+        let req = request.into_inner();
+
+        // Validate election exists
+        let election = db::get_election(&self.pool, &req.election_id)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?
+            .ok_or_else(|| Status::not_found("Election not found"))?;
+
+        if election.status != "open" {
+            return Err(Status::failed_precondition(
+                "Candidates can only be added to open elections",
+            ));
+        }
+
+        let candidate = Candidate {
+            id: req.id as i64,
+            election_id: req.election_id,
+            name: req.name,
+        };
+
+        db::add_candidate(&self.pool, &candidate)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?;
+
+        tracing::info!(
+            election_id = %candidate.election_id,
+            candidate_id = candidate.id,
+            "Candidate added"
+        );
+
+        Ok(Response::new(CandidateResponse {
+            id: candidate.id as u32,
+            election_id: candidate.election_id,
+            name: candidate.name,
+        }))
+    }
+
+    async fn cancel_election(
+        &self,
+        request: Request<ElectionIdRequest>,
+    ) -> Result<Response<StatusResponse>, Status> {
+        let election_id = &request.into_inner().election_id;
+
+        let rows = db::cancel_election(&self.pool, election_id)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?;
+
+        if rows == 0 {
+            return Err(Status::failed_precondition(
+                "Election not found or already finished/cancelled",
+            ));
+        }
+
+        tracing::info!(election_id = %election_id, "Election cancelled");
+        Ok(Response::new(StatusResponse {
+            success: true,
+            message: "Election cancelled".to_string(),
+        }))
+    }
+
+    async fn get_election(
+        &self,
+        request: Request<ElectionIdRequest>,
+    ) -> Result<Response<ElectionResponse>, Status> {
+        let election_id = &request.into_inner().election_id;
+
+        let election = db::get_election(&self.pool, election_id)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?
+            .ok_or_else(|| Status::not_found("Election not found"))?;
+
+        Ok(Response::new(election_to_response(&election)))
+    }
+
+    async fn list_elections(
+        &self,
+        _request: Request<Empty>,
+    ) -> Result<Response<ElectionListResponse>, Status> {
+        let elections = db::list_elections(&self.pool)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?;
+
+        let responses = elections.iter().map(election_to_response).collect();
+
+        Ok(Response::new(ElectionListResponse {
+            elections: responses,
+        }))
+    }
+
+    async fn generate_registration_tokens(
+        &self,
+        request: Request<GenerateTokensRequest>,
+    ) -> Result<Response<TokensResponse>, Status> {
+        let req = request.into_inner();
+
+        const MAX_TOKENS_PER_REQUEST: u32 = 10_000;
+        if req.count == 0 || req.count > MAX_TOKENS_PER_REQUEST {
+            return Err(Status::invalid_argument(format!(
+                "count must be between 1 and {MAX_TOKENS_PER_REQUEST}"
+            )));
+        }
+
+        // Validate election exists
+        db::get_election(&self.pool, &req.election_id)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?
+            .ok_or_else(|| Status::not_found("Election not found"))?;
+
+        // Generate random tokens
+        let tokens: Vec<String> = (0..req.count)
+            .map(|_| {
+                let mut bytes = [0u8; 32];
+                rand::RngExt::fill(&mut rand::rng(), &mut bytes);
+                base64::Engine::encode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, bytes)
+            })
+            .collect();
+
+        // Insert in a transaction
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?;
+
+        db::insert_registration_tokens(&mut tx, &req.election_id, &tokens)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?;
+
+        tx.commit()
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?;
+
+        tracing::info!(
+            election_id = %req.election_id,
+            count = tokens.len(),
+            "Registration tokens generated"
+        );
+
+        Ok(Response::new(TokensResponse { tokens }))
+    }
+
+    async fn list_registration_tokens(
+        &self,
+        request: Request<ElectionIdRequest>,
+    ) -> Result<Response<TokenListResponse>, Status> {
+        let election_id = &request.into_inner().election_id;
+
+        // Validate election exists
+        db::get_election(&self.pool, election_id)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?
+            .ok_or_else(|| Status::not_found("Election not found"))?;
+
+        let tokens = db::list_registration_tokens(&self.pool, election_id)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?;
+
+        let token_infos = tokens
+            .iter()
+            .map(|t| {
+                // Show truncated hash of token for display — never expose raw token
+                let hash = Sha256::digest(t.token.as_bytes());
+                let token_id = hex::encode(&hash[..8]);
+                TokenInfo {
+                    token_id,
+                    used: t.used != 0,
+                }
+            })
+            .collect();
+
+        Ok(Response::new(TokenListResponse {
+            tokens: token_infos,
+        }))
+    }
+}

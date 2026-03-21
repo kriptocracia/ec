@@ -625,10 +625,10 @@ tokio-test  = "0.4"
 - [x] Write integration tests for all 3 handlers
 
 ### Phase 6 — gRPC Admin API
-- [ ] Write `proto/admin.proto` (`AddElection` includes `rules_id`)
-- [ ] Configure `build.rs` for tonic-build
-- [ ] Implement `grpc/admin.rs`: all service methods
-- [ ] Implement `GenerateRegistrationTokens`
+- [x] Write `proto/admin.proto` (`AddElection` includes `rules_id`)
+- [x] Configure `build.rs` for tonic-prost-build
+- [x] Implement `grpc/admin.rs`: all service methods
+- [x] Implement `GenerateRegistrationTokens`
 
 ### Phase 7 — Scheduler
 - [ ] Implement `scheduler.rs`: 30s tick, status transitions
