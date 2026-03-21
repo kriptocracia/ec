@@ -186,7 +186,7 @@ time during the election lifecycle.
 - **FR-004**: The EC MUST expose a gRPC admin API on configurable address (default `127.0.0.1:50051`).
 - **FR-005**: The EC MUST persist all state (elections, candidates, voters, tokens, used nonces, votes) in SQLite using `sqlx`.
 - **FR-006**: The EC MUST restore complete state from SQLite on startup with no data loss.
-- **FR-007**: The EC MUST publish election events (Kind 35000) and tally/result events (Kind 35001) to Nostr relays using `nostr-sdk = "0.41"` with NIP-59.
+- **FR-007**: The EC MUST publish election events (Kind 35000) and tally/result events (Kind 35001) to Nostr relays using `nostr-sdk = "0.44.1"` with NIP-59.
 - **FR-008**: All voter↔EC messages MUST travel via NIP-59 Gift Wrap. The EC MUST ignore any non-Gift-Wrap messages from voter pubkeys.
 - **FR-009**: The EC MUST generate registration tokens on demand (gRPC `GenerateRegistrationTokens`).
 - **FR-010**: Registration tokens MUST be single-use. SQLite MUST enforce this with a unique constraint and a transaction-level check.
@@ -194,9 +194,9 @@ time during the election lifecycle.
 - **FR-012**: The EC MUST track used nonce hashes per election to prevent double voting.
 - **FR-013**: Election status transitions MUST be automatic, driven by a scheduler running every 30 seconds.
 - **FR-014**: The EC MUST log all significant events using `tracing` with configurable log level.
-- **FR-015**: RSA private keys MUST be loadable from environment variables OR from PEM files. They MUST NOT be hardcoded.
+- **FR-015**: RSA private keys MUST NOT be hardcoded. Per-election private keys MUST be stored in the `election_keys` table (DER base64, optionally encrypted at rest via `EC_DB_PASSWORD`).
 - **FR-016**: Each election MUST reference a `rules_id` that maps to a `.toml` file in the `rules/` directory. The EC MUST reject election creation if the `rules_id` is unknown.
-- **FR-017**: The EC MUST implement a `CountingAlgorithm` trait with the signature `fn count(&self, ballots: &[Ballot], rules: &ElectionRules) -> CountResult`. Each counting method (plurality, STV) MUST implement this trait independently.
+- **FR-017**: The EC MUST implement a `CountingAlgorithm` trait with the signature `fn count(&self, ballots: &[Ballot], rules: &ElectionRules) -> Result<CountResult>`. Each counting method (plurality, STV) MUST implement this fallible trait independently.
 - **FR-018**: The EC MUST validate each incoming ballot against the election's loaded `ElectionRules` before recording it (correct number of choices per `min_choices`/`max_choices`, all `candidate_ids` valid for the election).
 - **FR-019**: The `Vote` table MUST store `candidate_ids` as a JSON array (TEXT column) to support both single-choice and ranked ballots in the same schema.
 - **FR-020**: When an election finishes, the EC MUST invoke the appropriate `CountingAlgorithm::count()` with all recorded ballots and publish the result via Kind 35001. For `publish_tally = "live"` elections (plurality), intermediate tallies MAY be published after each vote as a lightweight count, but the canonical final result is always computed by the algorithm at close.

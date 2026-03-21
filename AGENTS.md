@@ -49,3 +49,4 @@ sqlx migrate run           # run SQLite migrations
 15. **Ballot validation happens in `handlers/cast_vote.rs`** before touching the DB. Use `validate_ballot()` against the election's loaded rules. A ballot that violates `min_choices`/`max_choices` or contains invalid candidate IDs MUST be rejected before any DB write.
 16. **`candidate_ids` in the `votes` table is a JSON TEXT array** (`[3]` or `[3,1,4,2]`). Never use a single integer column for votes — it breaks STV ranked ballots.
 17. Adding a new counting method = implement `CountingAlgorithm` + register in `algorithm_for()` + add a `.toml` in `rules/`. No other files need to change.
+18. **Add language identifiers to fenced code blocks** (e.g. `` ```rust ``, `` ```sql ``, `` ```text ``) to satisfy markdown linting (MD040).

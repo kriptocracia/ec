@@ -8,7 +8,7 @@
 
 ## Architecture Overview
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                    EC Daemon (single binary)                 │
 │                                                             │
@@ -38,7 +38,7 @@
 
 ## Directory Structure
 
-```
+```text
 ec/
 ├── Cargo.toml
 ├── build.rs                    # tonic protobuf compilation
@@ -381,7 +381,7 @@ db::store_result(&pool, &election.id, &result).await?;
 
 ### Principle: Hybrid Config with Priority Layers
 
-```
+```text
 env var  >  ec.toml  >  hardcoded default
 ```
 
@@ -513,7 +513,7 @@ pub type SharedState = Arc<AppState>;
 
 ### RSA Key per Election
 
-Each election gets its own RSA keypair at creation. Public key published in Kind 35000. Private key stored in `election_keys` table (PEM, optionally encrypted with `EC_DB_PASSWORD` env var). On restart, keys are re-loaded from DB.
+Each election gets its own RSA keypair at creation. Public key published in Kind 35000. Private key stored in `election_keys` table (DER base64, optionally encrypted with `EC_DB_PASSWORD` env var). On restart, keys are re-loaded from DB.
 
 ### Token Atomicity
 
@@ -594,7 +594,7 @@ tokio-test  = "0.4"
 - [x] Implement `types.rs` structs with serde (include `Ballot = Vec<u8>`)
 - [x] Implement `config.rs` — hybrid config system (see Config Architecture below)
 - [x] Add `ec.toml` example file to repo root (non-secret defaults)
-- [ ] Add `.env.example` to repo root (secret vars template, never commit `.env`)
+- [x] Add `.env.example` to repo root (secret vars template, never commit `.env`)
 - [x] Implement `state.rs` AppState + SharedState
 - [x] Implement `db.rs` with all query functions
 - [x] Write `main.rs` startup (DB connect + migrations, Nostr client init, AppState, tracing)
@@ -610,9 +610,9 @@ tokio-test  = "0.4"
 - [x] Write `tests/counting_stv_test.rs`: 10 ranked ballots, 2 seats, verify elected
 
 ### Phase 3 — Cryptography
-- [ ] Implement `crypto.rs`: `generate_keypair()`, `blind_sign()`, `verify_signature()`
-- [ ] Nonce is `[u8; 32]` (rand 0.10), NOT BigUint
-- [ ] Write crypto roundtrip integration test
+- [x] Implement `crypto.rs`: `generate_keypair()`, `blind_sign()`, `verify_signature()`
+- [x] Nonce is `[u8; 32]` (rand 0.10), NOT BigUint
+- [x] Write crypto roundtrip integration test
 
 ### Phase 4 — Nostr
 - [ ] Implement `nostr/publisher.rs`: `publish_election_event()`, `publish_result_event()`
