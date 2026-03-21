@@ -1,6 +1,7 @@
 use anyhow::Result;
 use nostr_sdk::prelude::*;
 
+use crate::handlers;
 use crate::nostr::messages::{InboundMessage, OutboundMessage};
 use crate::state::SharedState;
 
@@ -19,10 +20,7 @@ pub async fn listen(state: SharedState) -> Result<()> {
         .pubkey(ec_pubkey)
         .limit(0);
 
-    state
-        .nostr_client
-        .subscribe(filter, None)
-        .await?;
+    state.nostr_client.subscribe(filter, None).await?;
 
     tracing::info!("Nostr listener subscribed for Gift Wrap messages");
 
@@ -48,10 +46,7 @@ pub async fn listen(state: SharedState) -> Result<()> {
 /// Unwrap a Gift Wrap event, parse the inner message, dispatch to handler,
 /// and send the reply back via Gift Wrap.
 async fn handle_gift_wrap(state: &SharedState, event: &Event) -> Result<()> {
-    let unwrapped = state
-        .nostr_client
-        .unwrap_gift_wrap(event)
-        .await?;
+    let unwrapped = state.nostr_client.unwrap_gift_wrap(event).await?;
 
     let sender = unwrapped.sender;
     let content = &unwrapped.rumor.content;
@@ -70,26 +65,31 @@ async fn handle_gift_wrap(state: &SharedState, event: &Event) -> Result<()> {
 }
 
 /// Route an inbound message to the appropriate handler.
-///
-/// Handlers are implemented in Phase 5. For now, return a placeholder error.
-async fn dispatch(
-    _state: &SharedState,
-    _sender: &PublicKey,
-    msg: InboundMessage,
-) -> OutboundMessage {
-    // Phase 5 will fill in actual handler calls:
-    //   InboundMessage::Register { .. } => handlers::register::handle(state, sender, ..).await
-    //   InboundMessage::RequestToken { .. } => handlers::request_token::handle(state, sender, ..).await
-    //   InboundMessage::CastVote { .. } => handlers::cast_vote::handle(state, sender, ..).await
+async fn dispatch(state: &SharedState, sender: &PublicKey, msg: InboundMessage) -> OutboundMessage {
     match msg {
-        InboundMessage::Register { .. } => {
-            OutboundMessage::error("NOT_IMPLEMENTED", "register handler not yet implemented")
-        }
-        InboundMessage::RequestToken { .. } => {
-            OutboundMessage::error("NOT_IMPLEMENTED", "request-token handler not yet implemented")
-        }
-        InboundMessage::CastVote { .. } => {
-            OutboundMessage::error("NOT_IMPLEMENTED", "cast-vote handler not yet implemented")
+        InboundMessage::Register {
+            election_id,
+            registration_token,
+        } => handlers::register::handle(&state.db, sender, &election_id, &registration_token).await,
+        InboundMessage::RequestToken {
+            election_id,
+            blinded_nonce,
+        } => handlers::request_token::handle(&state.db, sender, &election_id, &blinded_nonce).await,
+        InboundMessage::CastVote {
+            election_id,
+            candidate_ids,
+            h_n,
+            token,
+        } => {
+            handlers::cast_vote::handle(
+                &state.db,
+                &election_id,
+                &candidate_ids,
+                &h_n,
+                &token,
+                &state.config.rules_dir,
+            )
+            .await
         }
     }
 }
@@ -102,13 +102,9 @@ async fn send_reply(
 ) -> Result<()> {
     let content = serde_json::to_string(response)?;
 
-    let rumor = EventBuilder::text_note(content)
-        .build(state.ec_nostr_keys.public_key());
+    let rumor = EventBuilder::text_note(content).build(state.ec_nostr_keys.public_key());
 
-    state
-        .nostr_client
-        .gift_wrap(receiver, rumor, [])
-        .await?;
+    state.nostr_client.gift_wrap(receiver, rumor, []).await?;
 
     Ok(())
 }

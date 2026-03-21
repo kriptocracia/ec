@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use ec::counting::{algorithm_for, Ballot};
+use ec::counting::{Ballot, algorithm_for};
 use ec::rules::load_rules;
 
 #[test]
@@ -14,16 +14,8 @@ fn plurality_single_winner_simple_majority() {
     let result = algo.count(&ballots, &rules).expect("count");
 
     assert_eq!(result.elected, vec![1]);
-    let c1 = result
-        .tally
-        .iter()
-        .find(|t| t.candidate_id == 1)
-        .unwrap();
-    let c2 = result
-        .tally
-        .iter()
-        .find(|t| t.candidate_id == 2)
-        .unwrap();
+    let c1 = result.tally.iter().find(|t| t.candidate_id == 1).unwrap();
+    let c2 = result.tally.iter().find(|t| t.candidate_id == 2).unwrap();
     assert_eq!(c1.votes, 3.0);
     assert_eq!(c2.votes, 2.0);
 }
@@ -48,16 +40,8 @@ fn plurality_multi_seat_top_two_elected() {
     let algo = algorithm_for("plurality").expect("algorithm");
 
     // Candidate 1: 3 votes, candidate 2: 2 votes, candidate 3: 1 vote.
-    let ballots: Vec<Ballot> = vec![
-        vec![1],
-        vec![1],
-        vec![1],
-        vec![2],
-        vec![2],
-        vec![3],
-    ];
+    let ballots: Vec<Ballot> = vec![vec![1], vec![1], vec![1], vec![2], vec![2], vec![3]];
 
     let result = algo.count(&ballots, &rules).expect("count");
     assert_eq!(result.elected, vec![1, 2]);
 }
-

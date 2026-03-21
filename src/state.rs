@@ -13,4 +13,3 @@ pub struct AppState {
 }
 
 pub type SharedState = Arc<AppState>;
-
