@@ -615,9 +615,9 @@ tokio-test  = "0.4"
 - [x] Write crypto roundtrip integration test
 
 ### Phase 4 — Nostr
-- [ ] Implement `nostr/publisher.rs`: `publish_election_event()`, `publish_result_event()`
-- [ ] Implement `nostr/listener.rs`: Gift Wrap subscription, message dispatch
-- [ ] Implement `nostr/messages.rs`: inbound/outbound types (`candidate_ids` as array)
+- [x] Implement `nostr/publisher.rs`: `publish_election_event()`, `publish_result_event()`
+- [x] Implement `nostr/listener.rs`: Gift Wrap subscription, message dispatch
+- [x] Implement `nostr/messages.rs`: inbound/outbound types (`candidate_ids` as array)
 
 ### Phase 5 — Message Handlers
 - [ ] Implement `handlers/register.rs` (atomic token consumption)
