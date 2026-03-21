@@ -48,7 +48,7 @@ async fn seed_election(pool: &SqlitePool, te: &TestElection, rules_id: &str) {
     .unwrap();
 }
 
-async fn seed_candidates(pool: &SqlitePool, election_id: &str, ids: &[i64]) {
+async fn seed_candidates(pool: &SqlitePool, election_id: &str, ids: &[u8]) {
     for &id in ids {
         let candidate = Candidate {
             id,

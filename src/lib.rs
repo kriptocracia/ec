@@ -2,6 +2,7 @@ pub mod config;
 pub mod counting;
 pub mod crypto;
 pub mod db;
+pub mod grpc;
 pub mod handlers;
 pub mod nostr;
 pub mod rules;

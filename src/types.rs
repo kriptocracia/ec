@@ -18,7 +18,7 @@ pub struct Election {
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Candidate {
-    pub id: i64,
+    pub id: u8,
     pub election_id: String,
     pub name: String,
 }

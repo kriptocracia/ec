@@ -2,7 +2,7 @@ use anyhow::Result;
 use secrecy::{ExposeSecret, SecretString};
 use sqlx::{Sqlite, SqlitePool, Transaction};
 
-use crate::types::{AuthorizedVoter, Candidate, Election, UsedNonce, Vote};
+use crate::types::{AuthorizedVoter, Candidate, Election, RegistrationToken, UsedNonce, Vote};
 
 pub async fn create_election(
     pool: &SqlitePool,
@@ -88,6 +88,21 @@ pub async fn list_elections(pool: &SqlitePool) -> Result<Vec<Election>> {
     Ok(elections)
 }
 
+pub async fn cancel_election(pool: &SqlitePool, election_id: &str) -> Result<u64> {
+    let result = sqlx::query(
+        r#"
+        UPDATE elections
+        SET status = 'cancelled'
+        WHERE id = ?1 AND status IN ('open', 'in_progress')
+        "#,
+    )
+    .bind(election_id)
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected())
+}
+
 pub async fn add_candidate(pool: &SqlitePool, candidate: &Candidate) -> Result<()> {
     sqlx::query(
         r#"
@@ -102,6 +117,27 @@ pub async fn add_candidate(pool: &SqlitePool, candidate: &Candidate) -> Result<(
     .await?;
 
     Ok(())
+}
+
+/// Insert a candidate only if the referenced election has status = 'open'.
+/// Returns the number of rows inserted (0 if election not found or not open).
+pub async fn add_candidate_if_open(pool: &SqlitePool, candidate: &Candidate) -> Result<u64> {
+    let result = sqlx::query(
+        r#"
+        INSERT INTO candidates (id, election_id, name)
+        SELECT ?1, ?2, ?3
+        WHERE EXISTS (
+            SELECT 1 FROM elections WHERE id = ?2 AND status = 'open'
+        )
+        "#,
+    )
+    .bind(candidate.id)
+    .bind(&candidate.election_id)
+    .bind(&candidate.name)
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected())
 }
 
 pub async fn get_candidates_for_election(
@@ -127,9 +163,10 @@ pub async fn insert_registration_tokens(
     tx: &mut Transaction<'_, Sqlite>,
     election_id: &str,
     tokens: &[String],
-) -> Result<()> {
+) -> Result<u64> {
+    let mut total: u64 = 0;
     for token in tokens {
-        sqlx::query(
+        let result = sqlx::query(
             r#"
             INSERT INTO registration_tokens (token, election_id)
             VALUES (?1, ?2)
@@ -139,9 +176,29 @@ pub async fn insert_registration_tokens(
         .bind(election_id)
         .execute(tx.as_mut())
         .await?;
+        total += result.rows_affected();
     }
 
-    Ok(())
+    Ok(total)
+}
+
+pub async fn list_registration_tokens(
+    pool: &SqlitePool,
+    election_id: &str,
+) -> Result<Vec<RegistrationToken>> {
+    let tokens = sqlx::query_as::<_, RegistrationToken>(
+        r#"
+        SELECT token, election_id, used, voter_pubkey, created_at, used_at
+        FROM registration_tokens
+        WHERE election_id = ?1
+        ORDER BY created_at ASC
+        "#,
+    )
+    .bind(election_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(tokens)
 }
 
 /// Atomically consume a registration token, marking it as used by the given voter.
