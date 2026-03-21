@@ -116,6 +116,8 @@ By default, this will:
 - Connect to the SQLite database at `db_path` / `DATABASE_URL`
 - Run migrations from `./migrations`
 - Initialize Nostr client and EC identity
+- Start the scheduler (30s tick: election status transitions + vote counting + result publishing)
+- Start the Nostr listener for Gift Wrap voter messages
 - Bind the gRPC admin API to `grpc_bind` (default `127.0.0.1:50051`)
 
 ## High-Level Architecture

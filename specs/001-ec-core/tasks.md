@@ -50,7 +50,7 @@
 - [x] On `Finished`: load rules → `algorithm_for(rules_id)?.count()` → publish result
 
 ## Phase 8 — Polish
-- [ ] `tracing` instrumentation throughout
-- [ ] `cargo clippy --all-targets --all-features -- -D warnings` clean
-- [ ] README
-- [ ] Docker Compose (ec + nostr relay)
+- [x] `tracing` instrumentation throughout
+- [x] `cargo clippy --all-targets --all-features -- -D warnings` clean
+- [x] README
+- [x] Docker Compose (ec + nostr relay)

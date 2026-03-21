@@ -1,0 +1,32 @@
+services:
+  relay:
+    image: scsibug/nostr-rs-relay:0.9.0
+    ports:
+      - "8080:8080"
+    volumes:
+      - relay-data:/usr/src/app/db
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8080"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  ec:
+    build: .
+    depends_on:
+      relay:
+        condition: service_healthy
+    ports:
+      - "50051:50051"
+    environment:
+      NOSTR_PRIVATE_KEY: ${NOSTR_PRIVATE_KEY}
+      RELAY_URL: ws://relay:8080
+      GRPC_BIND: 0.0.0.0:50051
+      DATABASE_URL: /app/data/ec.db
+      RULES_DIR: /app/rules
+    volumes:
+      - ec-data:/app/data
+
+volumes:
+  relay-data:
+  ec-data:
