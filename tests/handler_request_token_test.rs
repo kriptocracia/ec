@@ -1,6 +1,7 @@
 use base64::Engine;
 use blind_rsa_signatures::{DefaultRng, PSS, Randomized, Sha384};
 use nostr_sdk::prelude::*;
+use secrecy::SecretString;
 use sqlx::SqlitePool;
 
 use ec::db;
@@ -28,7 +29,9 @@ async fn seed_election_with_key(pool: &SqlitePool, status: &str, pk_b64: &str, s
         rsa_pub_key: pk_b64.to_string(),
         created_at: 1000,
     };
-    db::create_election(pool, &election, sk_b64).await.unwrap();
+    db::create_election(pool, &election, &SecretString::new(sk_b64.into()))
+        .await
+        .unwrap();
 }
 
 async fn seed_authorized_voter(pool: &SqlitePool, election_id: &str, voter_hex: &str) {

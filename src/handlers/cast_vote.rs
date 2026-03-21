@@ -65,9 +65,11 @@ async fn handle_inner(
 
     let (signature, msg_randomizer) = token_bytes.split_at(token_bytes.len() - 32);
 
-    // The message being verified is the nonce hash (h_n) as raw bytes
+    // The message being verified is the nonce hash (h_n) as raw bytes.
+    // Canonicalize to lowercase hex to prevent case-based replay attacks.
     let h_n_bytes = hex::decode(h_n)
         .map_err(|_| anyhow::anyhow!("INVALID_TOKEN: Malformed nonce hash (not valid hex)"))?;
+    let h_n = &hex::encode(&h_n_bytes);
 
     crate::crypto::verify_signature(&election.rsa_pub_key, signature, msg_randomizer, &h_n_bytes)
         .map_err(|_| anyhow::anyhow!("INVALID_TOKEN: Signature verification failed"))?;

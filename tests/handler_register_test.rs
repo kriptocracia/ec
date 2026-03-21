@@ -1,4 +1,5 @@
 use nostr_sdk::prelude::*;
+use secrecy::SecretString;
 use sqlx::SqlitePool;
 
 use ec::db;
@@ -26,7 +27,7 @@ fn test_election(status: &str) -> Election {
 
 async fn seed_election(pool: &SqlitePool, status: &str) {
     let election = test_election(status);
-    db::create_election(pool, &election, "dummy-sk")
+    db::create_election(pool, &election, &SecretString::new("dummy-sk".into()))
         .await
         .unwrap();
 }

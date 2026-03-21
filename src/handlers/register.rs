@@ -53,14 +53,20 @@ async fn handle_inner(
     let mut tx = pool.begin().await?;
 
     let rows =
-        crate::db::consume_registration_token(&mut tx, registration_token, &voter_hex).await?;
+        crate::db::consume_registration_token(&mut tx, registration_token, election_id, &voter_hex)
+            .await?;
 
     if rows == 0 {
         // Token was not consumed — either invalid or already used
         anyhow::bail!("INVALID_TOKEN: Registration token is invalid or already used");
     }
 
-    crate::db::authorize_voter(&mut tx, election_id, &voter_hex).await?;
+    let auth_rows = crate::db::authorize_voter(&mut tx, election_id, &voter_hex).await?;
+
+    if auth_rows == 0 {
+        // Voter is already authorized — token was consumed for nothing, roll back
+        anyhow::bail!("ALREADY_REGISTERED: Voter is already authorized for this election");
+    }
 
     tx.commit().await?;
 
@@ -79,6 +85,7 @@ fn error_code(code: &str) -> &'static str {
         "ELECTION_NOT_FOUND" => "ELECTION_NOT_FOUND",
         "ELECTION_CLOSED" => "ELECTION_CLOSED",
         "INVALID_TOKEN" => "INVALID_TOKEN",
+        "ALREADY_REGISTERED" => "ALREADY_REGISTERED",
         _ => "INTERNAL_ERROR",
     }
 }

@@ -1,4 +1,5 @@
 use anyhow::Result;
+use secrecy::{ExposeSecret, SecretString};
 use sqlx::{Sqlite, SqlitePool, Transaction};
 
 use crate::types::{AuthorizedVoter, Candidate, Election, UsedNonce, Vote};
@@ -6,7 +7,7 @@ use crate::types::{AuthorizedVoter, Candidate, Election, UsedNonce, Vote};
 pub async fn create_election(
     pool: &SqlitePool,
     election: &Election,
-    rsa_priv_key: &str,
+    rsa_priv_key: &SecretString,
 ) -> Result<()> {
     let mut tx = pool.begin().await?;
 
@@ -34,7 +35,7 @@ pub async fn create_election(
         "#,
     )
     .bind(&election.id)
-    .bind(rsa_priv_key)
+    .bind(rsa_priv_key.expose_secret())
     .execute(&mut *tx)
     .await?;
 
@@ -144,32 +145,37 @@ pub async fn insert_registration_tokens(
 }
 
 /// Atomically consume a registration token, marking it as used by the given voter.
+/// Filters by both token and election_id to prevent cross-election token use.
 pub async fn consume_registration_token(
     tx: &mut Transaction<'_, Sqlite>,
     token: &str,
+    election_id: &str,
     voter_pubkey: &str,
 ) -> Result<u64> {
     let result = sqlx::query(
         r#"
         UPDATE registration_tokens
         SET used = 1, voter_pubkey = ?1, used_at = unixepoch()
-        WHERE token = ?2 AND used = 0
+        WHERE token = ?2 AND election_id = ?3 AND used = 0
         "#,
     )
     .bind(voter_pubkey)
     .bind(token)
+    .bind(election_id)
     .execute(tx.as_mut())
     .await?;
 
     Ok(result.rows_affected())
 }
 
+/// Insert an authorized voter record. Returns the number of rows affected.
+/// Uses INSERT OR IGNORE so a duplicate (voter_pubkey, election_id) returns 0.
 pub async fn authorize_voter(
     tx: &mut Transaction<'_, Sqlite>,
     election_id: &str,
     voter_pubkey: &str,
-) -> Result<()> {
-    sqlx::query(
+) -> Result<u64> {
+    let result = sqlx::query(
         r#"
         INSERT OR IGNORE INTO authorized_voters (voter_pubkey, election_id)
         VALUES (?1, ?2)
@@ -180,7 +186,7 @@ pub async fn authorize_voter(
     .execute(tx.as_mut())
     .await?;
 
-    Ok(())
+    Ok(result.rows_affected())
 }
 
 pub async fn get_authorized_voter(

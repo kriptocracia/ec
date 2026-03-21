@@ -1,5 +1,6 @@
 use base64::Engine;
 use blind_rsa_signatures::{DefaultRng, PSS, Randomized, Sha384};
+use secrecy::SecretString;
 use sha2::Digest;
 use sqlx::SqlitePool;
 use std::path::Path;
@@ -38,9 +39,13 @@ async fn seed_election(pool: &SqlitePool, te: &TestElection, rules_id: &str) {
         rsa_pub_key: te.pk_b64.clone(),
         created_at: 1000,
     };
-    db::create_election(pool, &election, &te.sk_b64)
-        .await
-        .unwrap();
+    db::create_election(
+        pool,
+        &election,
+        &SecretString::new(te.sk_b64.clone().into()),
+    )
+    .await
+    .unwrap();
 }
 
 async fn seed_candidates(pool: &SqlitePool, election_id: &str, ids: &[i64]) {
