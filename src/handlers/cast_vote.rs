@@ -83,14 +83,7 @@ async fn handle_inner(
     })?;
 
     let candidates = crate::db::get_candidates_for_election(pool, election_id).await?;
-    let valid_ids: Vec<u8> = candidates
-        .iter()
-        .map(|c| {
-            u8::try_from(c.id).map_err(|_| {
-                anyhow::anyhow!("INTERNAL_ERROR: Candidate ID {} exceeds u8 range", c.id)
-            })
-        })
-        .collect::<anyhow::Result<_>>()?;
+    let valid_ids: Vec<u8> = candidates.iter().map(|c| c.id).collect();
 
     validate_ballot(candidate_ids, &rules, &valid_ids)?;
 

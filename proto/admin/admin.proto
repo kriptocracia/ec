@@ -1,5 +1,5 @@
 syntax = "proto3";
-package admin;
+package proto.admin;
 
 service Admin {
   rpc AddElection (AddElectionRequest) returns (ElectionResponse);

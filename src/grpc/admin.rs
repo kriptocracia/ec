@@ -106,7 +106,7 @@ impl Admin for AdminService {
 
         // Atomically insert candidate only if election is open
         let candidate = Candidate {
-            id: req.id as i64,
+            id: req.id as u8,
             election_id: req.election_id,
             name: req.name,
         };
