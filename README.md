@@ -56,8 +56,7 @@ These values can be overridden by environment variables:
 Secrets are **never** stored in `ec.toml`. They are loaded only from environment variables and kept in memory as `SecretString`:
 
 - `NOSTR_PRIVATE_KEY` — hex-encoded Nostr private key for the EC identity (**required**)
-- `EC_RSA_KEY_PATH` — path to the RSA private key PEM used for blind signatures (**required**)
-- `EC_DB_PASSWORD` — optional password for encrypting the SQLite database (if you implement this)
+- `EC_DB_PASSWORD` — optional password for encrypting per-election RSA keys stored in the database (not yet implemented)
 
 For local development, you can use `.env` (loaded by `dotenvy`) from the provided template:
 
@@ -84,20 +83,7 @@ From highest to lowest priority:
 - OpenSSL CLI available on your PATH (for key generation)  
 - SQLite (or let `sqlx` create `ec.db` on first run)
 
-### 2. Generate RSA keys for blind signatures
-
-Generate a 2048-bit RSA private key in PEM format:
-
-```bash
-openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out ec_rsa.pem
-```
-
-This produces:
-
-- Private key: `ec_rsa.pem` (keep secret, path goes into `EC_RSA_KEY_PATH`)
-  - You may also derive a public key and store it as needed for announcements.
-
-### 3. Configure secrets and non-secrets
+### 2. Configure secrets and non-secrets
 
 1. Edit `ec.toml` if you want to change relay, ports, or DB path.
 2. Create `.env` from the example:
@@ -110,13 +96,12 @@ Then set at least:
 
 ```bash
 NOSTR_PRIVATE_KEY=your_hex_private_key_here
-EC_RSA_KEY_PATH=./ec_rsa.pem
 # Optional:
 # EC_DB_PASSWORD=...
 # RELAY_URL=wss://your-relay.example
 ```
 
-### 4. Run migrations and start the daemon
+### 3. Run migrations and start the daemon
 
 The EC daemon uses `sqlx` with SQLite and runs migrations at startup.
 

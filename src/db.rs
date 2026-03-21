@@ -5,7 +5,9 @@ use crate::types::{
     AuthorizedVoter, Candidate, Election, RegistrationToken, UsedNonce, Vote,
 };
 
-pub async fn create_election(pool: &SqlitePool, election: &Election) -> Result<()> {
+pub async fn create_election(pool: &SqlitePool, election: &Election, rsa_priv_key: &str) -> Result<()> {
+    let mut tx = pool.begin().await?;
+
     sqlx::query(
         r#"
         INSERT INTO elections (id, name, start_time, end_time, status, rules_id, rsa_pub_key, created_at)
@@ -20,10 +22,38 @@ pub async fn create_election(pool: &SqlitePool, election: &Election) -> Result<(
     .bind(&election.rules_id)
     .bind(&election.rsa_pub_key)
     .bind(election.created_at)
-    .execute(pool)
+    .execute(&mut *tx)
     .await?;
 
+    sqlx::query(
+        r#"
+        INSERT INTO election_keys (election_id, rsa_priv_key)
+        VALUES (?1, ?2)
+        "#,
+    )
+    .bind(&election.id)
+    .bind(rsa_priv_key)
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+
     Ok(())
+}
+
+pub async fn get_election_key(pool: &SqlitePool, election_id: &str) -> Result<Option<String>> {
+    let key: Option<(String,)> = sqlx::query_as(
+        r#"
+        SELECT rsa_priv_key
+        FROM election_keys
+        WHERE election_id = ?1
+        "#,
+    )
+    .bind(election_id)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(key.map(|(k,)| k))
 }
 
 pub async fn get_election(pool: &SqlitePool, id: &str) -> Result<Option<Election>> {
