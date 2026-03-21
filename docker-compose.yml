@@ -1,15 +1,21 @@
 services:
   relay:
-    image: scsibug/nostr-rs-relay:latest
+    image: scsibug/nostr-rs-relay:0.9.0
     ports:
       - "8080:8080"
     volumes:
       - relay-data:/usr/src/app/db
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8080"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   ec:
     build: .
     depends_on:
-      - relay
+      relay:
+        condition: service_healthy
     ports:
       - "50051:50051"
     environment:
