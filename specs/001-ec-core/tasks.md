@@ -23,7 +23,7 @@
 - [x] Write `tests/counting_stv_test.rs`: 10 ranked ballots, 2 seats, verify elected
 
 ## Phase 3 — Cryptography
-- [x] Implement `crypto.rs`: `generate_keypair()`, `blind_sign()`, `verify_token()`
+- [x] Implement `crypto.rs`: `generate_keypair()`, `blind_sign()`, `verify_signature()`
 - [x] Nonce is `[u8; 32]` (rand 0.10), NOT BigUint
 - [x] Write crypto roundtrip integration test
 

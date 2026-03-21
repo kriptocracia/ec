@@ -45,7 +45,8 @@ ec/
 ├── proto/
 │   └── admin.proto             # gRPC service definition
 ├── migrations/
-│   └── 001_initial.sql         # elections, candidates, voters, tokens, nonces, votes
+│   ├── 001_initial.sql         # elections, candidates, voters, tokens, nonces, votes
+│   └── 002_election_keys.sql   # per-election RSA keypair storage
 ├── rules/                      # bundled election rule files (TOML)
 │   ├── plurality.toml          # Simple plurality / FPTP
 │   └── stv.toml                # Single Transferable Vote
@@ -55,7 +56,7 @@ ec/
 │   ├── state.rs                # AppState struct (shared Arc<>)
 │   ├── db.rs                   # all SQLite queries (no ORM, raw sqlx)
 │   ├── types.rs                # Election, Candidate, RegistrationToken, Vote, Ballot enums/structs
-│   ├── crypto.rs               # RSA keypair gen, blind_sign(), verify_token()
+│   ├── crypto.rs               # RSA keypair gen, blind_sign(), verify_signature()
 │   ├── rules/
 │   │   ├── mod.rs              # load_rules(rules_id) -> Result<ElectionRules>
 │   │   └── types.rs            # ElectionRules, BallotMethod, CountingAlgorithmId (serde TOML)
@@ -147,6 +148,16 @@ CREATE TABLE votes (
     -- NO voter identity. Ever.
     candidate_ids TEXT NOT NULL,
     recorded_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+```
+
+```sql
+-- migrations/002_election_keys.sql
+
+CREATE TABLE IF NOT EXISTS election_keys (
+    election_id TEXT PRIMARY KEY NOT NULL REFERENCES elections(id) ON DELETE CASCADE,
+    rsa_priv_key TEXT NOT NULL,           -- DER base64
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 ```
 
@@ -409,11 +420,7 @@ db_path    = "./ec.db"
 # Nostr identity for the EC daemon (hex private key)
 NOSTR_PRIVATE_KEY=your_hex_private_key_here
 
-# Path to the RSA private key PEM file used for blind signatures
-# Generate with: openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out ec_rsa.pem
-EC_RSA_KEY_PATH=./ec_rsa.pem
-
-# Optional: password to encrypt the SQLite database
+# Optional: password to encrypt per-election RSA keys stored in the database (not yet implemented)
 # EC_DB_PASSWORD=
 
 # Optional: override any ec.toml value via env (RELAY_URL, GRPC_BIND, etc.)
@@ -437,8 +444,7 @@ pub struct Config {
 
     // --- From env vars (secrets) ---
     pub nostr_private_key: SecretString,   // never logged, never cloned carelessly
-    pub rsa_key_path: PathBuf,             // path to PEM file
-    pub db_password: Option<SecretString>, // optional DB encryption
+    pub db_password: Option<SecretString>, // optional encryption for per-election RSA keys
 }
 
 impl Config {
@@ -467,10 +473,6 @@ impl Config {
             nostr_private_key: SecretString::new(
                 std::env::var("NOSTR_PRIVATE_KEY")
                     .context("NOSTR_PRIVATE_KEY env var is required")?
-            ),
-            rsa_key_path: PathBuf::from(
-                std::env::var("EC_RSA_KEY_PATH")
-                    .context("EC_RSA_KEY_PATH env var is required")?
             ),
             db_password: std::env::var("EC_DB_PASSWORD")
                 .ok()
@@ -511,7 +513,7 @@ pub type SharedState = Arc<AppState>;
 
 ### RSA Key per Election
 
-Each election gets its own RSA keypair at creation. Public key published in Kind 35000. Private key stored in `election_keys` table (PEM, optionally encrypted with `EC_DB_KEY` env var). On restart, keys are re-loaded from DB.
+Each election gets its own RSA keypair at creation. Public key published in Kind 35000. Private key stored in `election_keys` table (PEM, optionally encrypted with `EC_DB_PASSWORD` env var). On restart, keys are re-loaded from DB.
 
 ### Token Atomicity
 
@@ -608,7 +610,7 @@ tokio-test  = "0.4"
 - [x] Write `tests/counting_stv_test.rs`: 10 ranked ballots, 2 seats, verify elected
 
 ### Phase 3 — Cryptography
-- [ ] Implement `crypto.rs`: `generate_keypair()`, `blind_sign()`, `verify_token()`
+- [ ] Implement `crypto.rs`: `generate_keypair()`, `blind_sign()`, `verify_signature()`
 - [ ] Nonce is `[u8; 32]` (rand 0.10), NOT BigUint
 - [ ] Write crypto roundtrip integration test
 

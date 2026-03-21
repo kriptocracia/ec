@@ -17,7 +17,6 @@ pub struct Config {
 
     // --- From env vars (secrets) ---
     pub nostr_private_key: SecretString,
-    pub rsa_key_path: PathBuf,
     pub db_password: Option<SecretString>,
 }
 
@@ -68,10 +67,6 @@ impl Config {
                 .context("NOSTR_PRIVATE_KEY env var is required")?
                 .into_boxed_str(),
         );
-        let rsa_key_path = PathBuf::from(
-            std::env::var("EC_RSA_KEY_PATH")
-                .context("EC_RSA_KEY_PATH env var is required")?,
-        );
         let db_password = std::env::var("EC_DB_PASSWORD")
             .ok()
             .map(|s| SecretString::new(s.into_boxed_str()));
@@ -83,7 +78,6 @@ impl Config {
             log_level,
             db_path,
             nostr_private_key,
-            rsa_key_path,
             db_password,
         })
     }

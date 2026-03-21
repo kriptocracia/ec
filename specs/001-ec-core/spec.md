@@ -181,7 +181,7 @@ time during the election lifecycle.
 ### Functional Requirements
 
 - **FR-001**: The EC MUST support multiple concurrent elections.
-- **FR-002**: The EC MUST enforce blind RSA signatures using `blind-rsa-signatures = "0.15.2"` with RSA keys of at least 2048 bits.
+- **FR-002**: The EC MUST enforce blind RSA signatures using `blind-rsa-signatures = "0.17.1"` with RSA keys of at least 2048 bits.
 - **FR-003**: The EC MUST generate per-election RSA keypairs (not shared across elections).
 - **FR-004**: The EC MUST expose a gRPC admin API on configurable address (default `127.0.0.1:50051`).
 - **FR-005**: The EC MUST persist all state (elections, candidates, voters, tokens, used nonces, votes) in SQLite using `sqlx`.
