@@ -81,7 +81,7 @@ On startup, the EC will:
 
 The core idea: the EC signs a voting token **without seeing its content** (blind signature). This makes it cryptographically impossible to link a vote back to the voter who requested the token.
 
-```
+```text
 ┌─────────────┐     gRPC      ┌─────────────────┐     Nostr      ┌─────────────┐
 │   Operator  │──────────────►│       EC        │◄──────────────►│   Voters    │
 │   (Admin)   │  Port 50051   │  (Electoral     │  NIP-59 Gift   │  (Clients)  │
@@ -282,7 +282,7 @@ The `token` field is the base64-encoded concatenation of the unblinded RSA signa
 
 ## Election Status Flow
 
-```
+```text
   open ──────► in_progress ──────► finished
    │                                   ▲
    │                                   │
@@ -364,7 +364,7 @@ See `rules/plurality.toml` and `rules/stv.toml` for the full configuration schem
 
 ### Precedence
 
-```
+```text
 Environment variable  >  ec.toml  >  Hardcoded default
 ```
 
