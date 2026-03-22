@@ -95,6 +95,13 @@ impl Admin for AdminService {
             results_published: 0,
         };
 
+        // Re-check: keypair generation may have taken enough time for start_time to lapse.
+        if election.start_time < chrono::Utc::now().timestamp() {
+            return Err(Status::invalid_argument(
+                "start_time must be in the future",
+            ));
+        }
+
         let sk_secret = SecretString::new(sk_b64.into_boxed_str());
         db::create_election(&self.pool, &election, &sk_secret)
             .await
