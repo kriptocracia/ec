@@ -1,3 +1,4 @@
+use nostr_sdk::prelude::Client;
 use secrecy::SecretString;
 use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
@@ -10,16 +11,21 @@ use crate::grpc::proto::{
     TokenInfo, TokenListResponse, TokensResponse,
 };
 use crate::types::{Candidate, Election};
-use crate::{crypto, db, rules};
+use crate::{crypto, db, nostr, rules};
 
 pub struct AdminService {
     pool: SqlitePool,
     rules_dir: std::path::PathBuf,
+    nostr_client: Client,
 }
 
 impl AdminService {
-    pub fn new(pool: SqlitePool, rules_dir: std::path::PathBuf) -> Self {
-        Self { pool, rules_dir }
+    pub fn new(pool: SqlitePool, rules_dir: std::path::PathBuf, nostr_client: Client) -> Self {
+        Self {
+            pool,
+            rules_dir,
+            nostr_client,
+        }
     }
 }
 
@@ -45,6 +51,12 @@ impl Admin for AdminService {
         let req = request.into_inner();
 
         // Validate time constraints
+        let now = chrono::Utc::now().timestamp();
+        if req.start_time < now {
+            return Err(Status::invalid_argument(
+                "start_time must be in the future",
+            ));
+        }
         if req.end_time <= req.start_time {
             return Err(Status::invalid_argument(
                 "end_time must be greater than start_time",
@@ -83,12 +95,31 @@ impl Admin for AdminService {
             results_published: 0,
         };
 
+        // Re-check: keypair generation may have taken enough time for start_time to lapse.
+        if election.start_time < chrono::Utc::now().timestamp() {
+            return Err(Status::invalid_argument(
+                "start_time must be in the future",
+            ));
+        }
+
         let sk_secret = SecretString::new(sk_b64.into_boxed_str());
         db::create_election(&self.pool, &election, &sk_secret)
             .await
             .map_err(|e| Status::internal(e.to_string()))?;
 
         tracing::info!(election_id = %election.id, "Election created");
+
+        // Publish Kind 35000 election announcement to Nostr (empty candidates at creation).
+        if let Err(e) =
+            nostr::publisher::publish_election_event(&self.nostr_client, &election, &[]).await
+        {
+            tracing::warn!(
+                election_id = %election.id,
+                error = %e,
+                "Failed to publish election announcement to Nostr"
+            );
+        }
+
         Ok(Response::new(election_to_response(&election)))
     }
 
@@ -127,6 +158,30 @@ impl Admin for AdminService {
             candidate_id = candidate.id,
             "Candidate added"
         );
+
+        // Re-publish Kind 35000 with updated candidate list (addressable event replaces previous).
+        let election = db::get_election(&self.pool, &candidate.election_id)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?;
+        if let Some(election) = election {
+            let candidates =
+                db::get_candidates_for_election(&self.pool, &candidate.election_id)
+                    .await
+                    .map_err(|e| Status::internal(e.to_string()))?;
+            if let Err(e) = nostr::publisher::publish_election_event(
+                &self.nostr_client,
+                &election,
+                &candidates,
+            )
+            .await
+            {
+                tracing::warn!(
+                    election_id = %election.id,
+                    error = %e,
+                    "Failed to re-publish election announcement to Nostr"
+                );
+            }
+        }
 
         Ok(Response::new(CandidateResponse {
             id: candidate.id as u32,

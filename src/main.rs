@@ -54,9 +54,22 @@ async fn main() -> Result<()> {
     // Spawn the Nostr Gift Wrap listener.
     let listener_handle = tokio::spawn(ec::nostr::listener::listen(state.clone()));
 
-    tracing::info!("EC daemon running");
+    // Start the gRPC admin API server.
+    let grpc_addr = state.config.grpc_bind.parse()?;
+    let admin_service = ec::grpc::admin::AdminService::new(
+        state.db.clone(),
+        state.config.rules_dir.clone(),
+        state.nostr_client.clone(),
+    );
+    let grpc_handle = tokio::spawn(
+        tonic::transport::Server::builder()
+            .add_service(ec::grpc::proto::admin_server::AdminServer::new(admin_service))
+            .serve(grpc_addr),
+    );
 
-    // Wait for either task to finish (they run forever under normal operation).
+    tracing::info!(grpc_bind = %state.config.grpc_bind, "EC daemon running");
+
+    // Wait for any task to finish (they run forever under normal operation).
     tokio::select! {
         res = scheduler_handle => {
             match res {
@@ -74,6 +87,16 @@ async fn main() -> Result<()> {
                     anyhow::bail!("Nostr listener exited unexpectedly")
                 }
                 Ok(Err(e)) => Err(e),
+                Err(join_err) => Err(join_err.into()),
+            }
+        }
+        res = grpc_handle => {
+            match res {
+                Ok(Ok(())) => {
+                    tracing::error!("gRPC server exited unexpectedly");
+                    anyhow::bail!("gRPC server exited unexpectedly")
+                }
+                Ok(Err(e)) => Err(e.into()),
                 Err(join_err) => Err(join_err.into()),
             }
         }
