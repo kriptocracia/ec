@@ -3,7 +3,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use nostr_sdk::prelude::{Client, Keys};
 use secrecy::ExposeSecret;
-use sqlx::sqlite::SqlitePoolOptions;
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+use std::str::FromStr;
 use tracing_subscriber::EnvFilter;
 
 use ec::config::Config;
@@ -15,9 +16,12 @@ async fn main() -> Result<()> {
 
     let config = Config::load()?;
 
+    let options = SqliteConnectOptions::from_str(&config.db_path)?
+        .create_if_missing(true);
+
     let db = SqlitePoolOptions::new()
         .max_connections(5)
-        .connect(&config.db_path)
+        .connect_with(options)
         .await?;
 
     // Run pending migrations
@@ -27,6 +31,8 @@ async fn main() -> Result<()> {
     let nostr_sk = config.nostr_private_key.expose_secret();
     let keys = Keys::parse(nostr_sk)?;
     let nostr_client = Client::builder().signer(keys.clone()).build();
+    nostr_client.add_relay(&config.relay_url).await?;
+    nostr_client.connect().await;
     let ec_nostr_keys = keys;
 
     let state = Arc::new(AppState {
